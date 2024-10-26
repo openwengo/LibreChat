@@ -122,19 +122,34 @@ async function loadActionSets(searchParams) {
  * @param {Objetct} additionalHeaders - Headers to pass for the action.
  * @returns { Promise<typeof tool | { _call: (toolInput: Object | string) => unknown}> } An object with `_call` method to execute the tool input.
  */
-async function createActionTool({ action, requestBuilder, zodSchema, name, description, additionalHeaders ={} }) {
+async function createActionTool({ action, requestBuilder, zodSchema, name, description, additionalHeaders = {} }) {
   action.metadata = await decryptMetadata(action.metadata);
   /** @type {(toolInput: Object | string) => Promise<unknown>} */
   const _call = async (toolInput) => {
     try {
-      requestBuilder.setParams(toolInput);
+      // Create a deep copy of the requestBuilder to avoid side effects caused by setParams
+      const builderCopy = Object.assign(Object.create(Object.getPrototypeOf(requestBuilder)), {
+        ...requestBuilder,
+        domain: requestBuilder.domain,
+        path: requestBuilder.path,
+        method: requestBuilder.method,
+        operation: requestBuilder.operation,
+        isConsequential: requestBuilder.isConsequential,
+        contentType: requestBuilder.contentType,
+        requiredHeaders: [...(requestBuilder.requiredHeaders || [])],
+        authHeaders: { ...(requestBuilder.authHeaders || {}) },
+        customHeaders: { ...(requestBuilder.customHeaders || {}) },
+        authToken: requestBuilder.authToken,
+      });
+
+      builderCopy.setParams({...toolInput});
       if (action.metadata.auth && action.metadata.auth.type !== AuthTypeEnum.None) {
-        await requestBuilder.setAuth(action.metadata);
+        await builderCopy.setAuth(action.metadata);
       }
       
-      requestBuilder.setHeaders(additionalHeaders);
+      builderCopy.setHeaders(additionalHeaders);
       
-      const res = await requestBuilder.execute();
+      const res = await builderCopy.execute();
       if (typeof res.data === 'object') {
         return JSON.stringify(res.data);
       }
