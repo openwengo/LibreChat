@@ -127,29 +127,17 @@ async function createActionTool({ action, requestBuilder, zodSchema, name, descr
   /** @type {(toolInput: Object | string) => Promise<unknown>} */
   const _call = async (toolInput) => {
     try {
-      // Create a deep copy of the requestBuilder to avoid side effects caused by setParams
-      const builderCopy = Object.assign(Object.create(Object.getPrototypeOf(requestBuilder)), {
-        ...requestBuilder,
-        domain: requestBuilder.domain,
-        path: requestBuilder.path,
-        method: requestBuilder.method,
-        operation: requestBuilder.operation,
-        isConsequential: requestBuilder.isConsequential,
-        contentType: requestBuilder.contentType,
-        requiredHeaders: [...(requestBuilder.requiredHeaders || [])],
-        authHeaders: { ...(requestBuilder.authHeaders || {}) },
-        customHeaders: { ...(requestBuilder.customHeaders || {}) },
-        authToken: requestBuilder.authToken,
-      });
+      const executor = requestBuilder.createExecutor();
 
-      builderCopy.setParams({...toolInput});
+      // Chain the operations
+      const preparedExecutor = executor.setParams(toolInput);
+      preparedExecutor.setHeaders(additionalHeaders);
+
       if (action.metadata.auth && action.metadata.auth.type !== AuthTypeEnum.None) {
-        await builderCopy.setAuth(action.metadata);
+        await preparedExecutor.setAuth(action.metadata);
       }
-      
-      builderCopy.setHeaders(additionalHeaders);
-      
-      const res = await builderCopy.execute();
+      const res = await preparedExecutor.execute();
+
       if (typeof res.data === 'object') {
         return JSON.stringify(res.data);
       }

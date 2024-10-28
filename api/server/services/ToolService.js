@@ -338,13 +338,13 @@ async function processRequiredActions(client, requiredActions) {
       }
 
       // Initialize an object to hold additional headers
-      const additionalHeaders = {};
+      let additionalHeaders = {};
 
       // Detect if "x-openai-thread-id" is required for this operation
       if (requestBuilder.requiredHeaders.includes('x-openai-thread-id')) {
-        requestBuilder.setHeaders({
+        additionalHeaders = {
           'x-openai-thread-id': threadId,
-        });
+        };
       }
       
       tool = await createActionTool({ action: actionSet, requestBuilder, additionalHeaders });
