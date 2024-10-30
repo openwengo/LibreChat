@@ -20,6 +20,7 @@ const {
   getModelMaxTokens,
   genAzureChatCompletion,
   getModelMaxOutputTokens,
+  replaceSpecialVars,
 } = require('~/utils');
 const {
   truncateText,
@@ -99,6 +100,8 @@ class OpenAIClient extends BaseClient {
       this.modelOptions,
       this.options.modelOptions,
     );
+
+    this.isO1Model = /\bo1\b/i.test(this.modelOptions.model);
 
     this.defaultVisionModel = this.options.visionModel ?? 'gpt-4-vision-preview';
     if (typeof this.options.attachments?.then === 'function') {
@@ -550,7 +553,7 @@ class OpenAIClient extends BaseClient {
     }
 
     if (promptPrefix && this.isO1Model !== true) {
-      promptPrefix = `Instructions:\n${promptPrefix.trim()}`;
+      promptPrefix = `Instructions:\n${replaceSpecialVars(promptPrefix.trim())}`;
       instructions = {
         role: 'system',
         content: promptPrefix,
