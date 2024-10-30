@@ -148,6 +148,7 @@ class RequestConfig {
     readonly operation: string,
     readonly isConsequential: boolean,
     readonly contentType: string,
+    readonly requiredHeaders: string[]
   ) {}
 }
 
@@ -156,6 +157,7 @@ class RequestExecutor {
   params?: object;
   private operationHash?: string;
   private authHeaders: Record<string, string> = {};
+  private customHeaders: Record<string, string> = {};
   private authToken?: string;
 
   constructor(private config: RequestConfig) {
@@ -174,6 +176,10 @@ class RequestExecutor {
       }
     }
     return this;
+  }
+
+  setHeaders(headers: Record<string, string>) {
+    this.customHeaders = { ...this.customHeaders, ...headers };
   }
 
   async setAuth(metadata: ActionMetadata) {
@@ -247,9 +253,9 @@ class RequestExecutor {
     const url = createURL(this.config.domain, this.path);
     const headers = {
       ...this.authHeaders,
+      ...this.customHeaders,
       'Content-Type': this.config.contentType,
     };
-
     const method = this.config.method.toLowerCase();
 
     if (method === 'get') {
@@ -282,8 +288,9 @@ export class ActionRequest {
     operation: string,
     isConsequential: boolean,
     contentType: string,
+    requiredHeaders: string[],
   ) {
-    this.config = new RequestConfig(domain, path, method, operation, isConsequential, contentType);
+    this.config = new RequestConfig(domain, path, method, operation, isConsequential, contentType, requiredHeaders);
   }
 
   // Add getters to maintain backward compatibility
@@ -305,6 +312,9 @@ export class ActionRequest {
   get contentType() {
     return this.config.contentType;
   }
+  get requiredHeaders() {
+    return this.config.requiredHeaders;
+  }
 
   createExecutor() {
     return new RequestExecutor(this.config);
@@ -314,6 +324,12 @@ export class ActionRequest {
   setParams(params: object) {
     const executor = this.createExecutor();
     executor.setParams(params);
+    return executor;
+  }
+
+  setHeaders(headers: Record<string, string>) {
+    const executor = this.createExecutor();
+    executor.setHeaders(headers);
     return executor;
   }
 
@@ -379,6 +395,10 @@ export function openapiToFunction(
         required: [],
       };
 
+      // Collect custom header parameters
+      const headerParameters: OpenAPIV3.ParameterObject[] = [];
+      const requiredHeaders: string[] = [];
+
       if (operationObj.parameters) {
         for (const param of operationObj.parameters) {
           const paramObj = param as OpenAPIV3.ParameterObject;
@@ -386,9 +406,19 @@ export function openapiToFunction(
             { ...paramObj.schema } as OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject,
             openapiSpec.components,
           );
-          parametersSchema.properties[paramObj.name] = resolvedSchema;
-          if (paramObj.required === true) {
-            parametersSchema.required.push(paramObj.name);
+
+          if (paramObj.in === 'header') {
+            // Store header parameters separately
+            headerParameters.push(paramObj);
+            if (paramObj.required) {
+              requiredHeaders.push(paramObj.name);
+            }  
+          } else {
+            // Handle non-header parameters
+            parametersSchema.properties[paramObj.name] = resolvedSchema;
+            if (paramObj.required) {
+              parametersSchema.required.push(paramObj.name);
+            }
           }
         }
       }
@@ -421,6 +451,7 @@ export function openapiToFunction(
         operationId,
         !!(operationObj['x-openai-isConsequential'] ?? false), // Custom extension for consequential actions
         operationObj.requestBody ? 'application/json' : 'application/x-www-form-urlencoded',
+        requiredHeaders
       );
 
       requestBuilders[operationId] = actionRequest;
