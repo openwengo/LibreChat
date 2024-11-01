@@ -586,6 +586,7 @@ export const alternateName = {
   [EModelEndpoint.anthropic]: 'Anthropic',
   [EModelEndpoint.custom]: 'Custom',
   [EModelEndpoint.bedrock]: 'AWS Bedrock',
+  ollama: 'Ollama',
 };
 
 const sharedOpenAIModels = [
