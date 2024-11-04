@@ -186,6 +186,8 @@ export type Agent = {
   id: string;
   name: string | null;
   author?: string | null;
+  /** The original custom endpoint name, lowercased */
+  endpoint?: string | null;
   authorName?: string | null;
   description: string | null;
   created_at: number;
