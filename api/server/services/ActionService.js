@@ -128,7 +128,7 @@ async function createActionTool({ action, requestBuilder, zodSchema, name, descr
   const _call = async (toolInput) => {
     try {
       const executor = requestBuilder.createExecutor();
-
+      
       // Chain the operations
       const preparedExecutor = executor.setParams(toolInput);
       preparedExecutor.setHeaders(additionalHeaders);
@@ -136,8 +136,10 @@ async function createActionTool({ action, requestBuilder, zodSchema, name, descr
       if (action.metadata.auth && action.metadata.auth.type !== AuthTypeEnum.None) {
         await preparedExecutor.setAuth(action.metadata);
       }
-      const res = await preparedExecutor.execute();
 
+      
+      const res = await preparedExecutor.execute();
+      logger.warn(`calling ${preparedExecutor.config.domain}/${preparedExecutor.path} with params:${JSON.stringify(toolInput)} => ${JSON.stringify(res.data)}}`);
       if (typeof res.data === 'object') {
         return JSON.stringify(res.data);
       }
