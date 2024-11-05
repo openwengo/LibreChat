@@ -3,13 +3,7 @@ const { logger } = require('~/config');
 
 const getPreset = async (user, presetId) => {
   try {
-    // Try to find user-specific preset
-    let preset = await Preset.findOne({ user, presetId }).lean();
-    if (!preset) {
-      // If not found, try to find global preset
-      preset = await Preset.findOne({ presetId, isGlobal: true }).lean();
-    }
-    return preset;
+    return await Preset.findOne({ user, presetId }).lean();
   } catch (error) {
     logger.error('[getPreset] Error getting single preset', error);
     return { message: 'Error getting single preset' };
@@ -21,19 +15,7 @@ module.exports = {
   getPreset,
   getPresets: async (user, filter) => {
     try {
-
-      // Fetch user-specific presets
-      const userPresetsPromise = Preset.find({ ...filter, user }).lean();
-      // Fetch global presets
-      const globalPresetsPromise = Preset.find({ ...filter, isGlobal: true }).lean();
-
-      const [userPresets, globalPresets] = await Promise.all([
-        userPresetsPromise,
-        globalPresetsPromise,
-      ]);
-
-      // Combine global and user-specific presets
-      let presets = [...globalPresets, ...userPresets];
+      const presets = await Preset.find({ ...filter, user }).lean();
       const defaultValue = 10000;
 
       presets.sort((a, b) => {
@@ -46,6 +28,7 @@ module.exports = {
 
         return b.updatedAt - a.updatedAt;
       });
+
       return presets;
     } catch (error) {
       logger.error('[getPresets] Error getting presets', error);
@@ -54,29 +37,6 @@ module.exports = {
   },
   savePreset: async (user, { presetId, newPresetId, defaultPreset, ...preset }) => {
     try {
-      // Check if presetId corresponds to a global preset
-      if (presetId && !newPresetId) {
-        const existingPreset = await Preset.findOne({ presetId, isGlobal: true });
-        if (existingPreset) {
-          // User is attempting to edit a global preset
-          // Create a copy for the user
-          presetId = `user-${user}-${presetId}-${Date.now()}`; // Generate a unique presetId for the user
-
-          const { _id, createdAt, updatedAt, _v,isGlobal, ...presetWithoutIdAndTimestamps } = preset;
-
-          // Prepare the new preset data
-          const newPreset = {
-            presetId: presetId,
-            user: user,
-            isGlobal: false,
-            ...presetWithoutIdAndTimestamps,
-          };
-          // Assign the modified preset back
-          preset = newPreset;
-
-        }
-      }
-      
       const setter = { $set: {} };
       const { user: _, ...cleanPreset } = preset;
       const update = { presetId, ...cleanPreset };

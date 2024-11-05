@@ -17,11 +17,6 @@ const presetSchema = mongoose.Schema(
       type: String,
       default: null,
     },
-    isGlobal: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
     defaultPreset: {
       type: Boolean,
     },
