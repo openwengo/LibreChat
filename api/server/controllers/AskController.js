@@ -5,6 +5,7 @@ const { sendMessage, createOnProgress } = require('~/server/utils');
 const { getLogStores } = require('~/cache');
 const { saveMessage } = require('~/models');
 const { logger } = require('~/config');
+const { isEnabled } = require('~/server/utils');
 
 const AskController = async (req, res, next, initializeClient, addTitle) => {
   let {
@@ -112,8 +113,9 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
       logger.debug('[AskController] Request aborted on close');
     });
 
+    console.log("req.user:", req.user)
     const messageOptions = {
-      user,
+      user: isEnabled(process.env.SEND_USERNAME_TO_MODEL) ? ( req.user.email ? req.user.email : req.user.username ) : user,
       parentMessageId,
       conversationId,
       overrideParentMessageId,

@@ -9,6 +9,7 @@ const { getLLMConfig } = require('~/server/services/Endpoints/openAI/llm');
 const { isEnabled, isUserProvided } = require('~/server/utils');
 const { getAzureCredentials } = require('~/utils');
 const { OpenAIClient } = require('~/app');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 
 const initializeClient = async ({
   req,
@@ -26,6 +27,7 @@ const initializeClient = async ({
     AZURE_OPENAI_BASEURL,
     OPENAI_SUMMARIZE,
     DEBUG_OPENAI,
+    ASSISTANTS_EXTRA_HEADERS,
   } = process.env;
   const { key: expiresAt } = req.body;
   const modelName = overrideModel ?? req.body.model;
@@ -61,6 +63,14 @@ const initializeClient = async ({
     reverseProxyUrl: baseURL ? baseURL : null,
     ...endpointOption,
   };
+
+  if (ASSISTANTS_EXTRA_HEADERS) {
+    const headersList = ASSISTANTS_EXTRA_HEADERS.split(',').map(h => h.trim());
+    clientOptions.headers = resolveHeaders({
+      ...(clientOptions.headers ?? {}),
+      ...processExtraHeaders(headersList, req.user),
+    });
+  }
 
   const isAzureOpenAI = endpoint === EModelEndpoint.azureOpenAI;
   /** @type {false | TAzureConfig} */
