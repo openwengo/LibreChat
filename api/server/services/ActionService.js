@@ -118,9 +118,10 @@ async function loadActionSets(searchParams) {
  * @param {string | undefined} [params.name] - The name of the tool.
  * @param {string | undefined} [params.description] - The description for the tool.
  * @param {import('zod').ZodTypeAny | undefined} [params.zodSchema] - The Zod schema for tool input validation/definition
+ * @param {Objetct} additionalHeaders - Headers to pass for the action.
  * @returns { Promise<typeof tool | { _call: (toolInput: Object | string) => unknown}> } An object with `_call` method to execute the tool input.
  */
-async function createActionTool({ action, requestBuilder, zodSchema, name, description }) {
+async function createActionTool({ action, requestBuilder, zodSchema, name, description, additionalHeaders = {} }) {
   action.metadata = await decryptMetadata(action.metadata);
   /** @type {(toolInput: Object | string) => Promise<unknown>} */
   const _call = async (toolInput) => {
@@ -129,11 +130,11 @@ async function createActionTool({ action, requestBuilder, zodSchema, name, descr
 
       // Chain the operations
       const preparedExecutor = executor.setParams(toolInput);
+      preparedExecutor.setHeaders(additionalHeaders);
 
       if (action.metadata.auth && action.metadata.auth.type !== AuthTypeEnum.None) {
         await preparedExecutor.setAuth(action.metadata);
       }
-
       const res = await preparedExecutor.execute();
 
       if (typeof res.data === 'object') {
