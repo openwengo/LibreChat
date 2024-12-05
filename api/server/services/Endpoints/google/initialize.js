@@ -1,11 +1,12 @@
 const { EModelEndpoint, AuthKeys } = require('librechat-data-provider');
 const { getUserKey, checkUserKeyExpiry } = require('~/server/services/UserService');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 const { getLLMConfig } = require('~/server/services/Endpoints/google/llm');
 const { isEnabled } = require('~/server/utils');
 const { GoogleClient } = require('~/app');
 
 const initializeClient = async ({ req, res, endpointOption, overrideModel, optionsOnly }) => {
-  const { GOOGLE_KEY, GOOGLE_REVERSE_PROXY, GOOGLE_AUTH_HEADER, PROXY } = process.env;
+  const { GOOGLE_KEY, GOOGLE_REVERSE_PROXY, GOOGLE_AUTH_HEADER, PROXY, GOOGLE_EXTRA_HEADERS } = process.env;
   const isUserProvided = GOOGLE_KEY === 'user_provided';
   const { key: expiresAt } = req.body;
 
@@ -43,6 +44,11 @@ const initializeClient = async ({ req, res, endpointOption, overrideModel, optio
 
   if (allConfig) {
     clientOptions.streamRate = allConfig.streamRate;
+  }
+
+  if (GOOGLE_EXTRA_HEADERS) {
+    const headersList = GOOGLE_EXTRA_HEADERS.split(',').map(h => h.trim());
+    clientOptions.customHeaders = processExtraHeaders(headersList, req.user);
   }
 
   clientOptions = {

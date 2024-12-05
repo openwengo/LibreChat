@@ -168,6 +168,7 @@ class RequestConfig {
     readonly isConsequential: boolean,
     readonly contentType: string,
     readonly parameterLocations?: Record<string, 'query' | 'path' | 'header' | 'body'>,
+    readonly requiredHeaders?: string[],
   ) {}
 }
 
@@ -176,6 +177,7 @@ class RequestExecutor {
   params?: Record<string, unknown>;
   private operationHash?: string;
   private authHeaders: Record<string, string> = {};
+  private customHeaders: Record<string, string> = {};
   private authToken?: string;
 
   constructor(private config: RequestConfig) {
@@ -207,6 +209,10 @@ class RequestExecutor {
       }
     }
     return this;
+  }
+
+  setHeaders(headers: Record<string, string>) {
+    this.customHeaders = { ...this.customHeaders, ...headers };
   }
 
   async setAuth(metadata: ActionMetadataRuntime) {
@@ -292,6 +298,7 @@ class RequestExecutor {
     const headers: Record<string, string> = {
       ...this.authHeaders,
       ...(this.config.contentType ? { 'Content-Type': this.config.contentType } : {}),
+      ...this.customHeaders,
     };
     const method = this.config.method.toLowerCase();
     const axios = _axios.create();
@@ -350,8 +357,10 @@ export class ActionRequest {
     isConsequential: boolean,
     contentType: string,
     parameterLocations?: Record<string, 'query' | 'path' | 'header' | 'body'>,
+    requiredHeaders?: string[],
   ) {
-    this.config = new RequestConfig(domain, path, method, operation, isConsequential, contentType, parameterLocations);
+    this.config = new RequestConfig(
+      domain, path, method, operation, isConsequential, contentType, parameterLocations, requiredHeaders);
   }
 
   // Add getters to maintain backward compatibility
@@ -373,6 +382,9 @@ export class ActionRequest {
   get contentType() {
     return this.config.contentType;
   }
+  get requiredHeaders() {
+    return this.config.requiredHeaders;
+  }
 
   createExecutor() {
     return new RequestExecutor(this.config);
@@ -382,6 +394,12 @@ export class ActionRequest {
   setParams(params: Record<string, unknown>) {
     const executor = this.createExecutor();
     executor.setParams(params);
+    return executor;
+  }
+
+  setHeaders(headers: Record<string, string>) {
+    const executor = this.createExecutor();
+    executor.setHeaders(headers);
     return executor;
   }
 
@@ -463,8 +481,13 @@ export function openapiToFunction(
         required: [],
       };
 
+      // Collect custom header parameters
+      const headerParameters: OpenAPIV3.ParameterObject[] = [];
+      const requiredHeaders: string[] = [];
+
       if (operationObj.parameters) {
         for (const param of operationObj.parameters ?? []) {
+          const paramObj = param as OpenAPIV3.ParameterObject;
           const resolvedParam = resolveRef(
             param,
             openapiSpec.components,
@@ -479,10 +502,18 @@ export function openapiToFunction(
             resolvedParam.schema,
             openapiSpec.components,
           ) as OpenAPIV3.SchemaObject;
-
-          parametersSchema.properties[paramName] = paramSchema;
-          if (resolvedParam.required) {
-            parametersSchema.required.push(paramName);
+          if (paramObj.in === 'header') {
+            // Store header parameters separately
+            headerParameters.push(paramObj);
+            if (paramObj.required === true) {
+              requiredHeaders.push(paramObj.name);
+            }
+          } else {
+            // Handle non-header parameters
+            parametersSchema.properties[paramName] = paramSchema;
+            if (resolvedParam.required) {
+              parametersSchema.required.push(paramName);
+            }
           }
           // Record the parameter location from the OpenAPI "in" field.
           paramLocations[paramName] =
@@ -535,6 +566,7 @@ export function openapiToFunction(
         !!(operationObj['x-openai-isConsequential'] ?? false),
         operationObj.requestBody ? 'application/json' : '',
         paramLocations,
+        requiredHeaders,
       );
 
       requestBuilders[operationId] = actionRequest;

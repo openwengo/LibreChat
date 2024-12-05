@@ -8,9 +8,10 @@ const {
 } = require('~/server/services/UserService');
 const OpenAIClient = require('~/app/clients/OpenAIClient');
 const { isUserProvided } = require('~/server/utils');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 
 const initializeClient = async ({ req, res, endpointOption, version, initAppClient = false }) => {
-  const { PROXY, OPENAI_ORGANIZATION, ASSISTANTS_API_KEY, ASSISTANTS_BASE_URL } = process.env;
+  const { PROXY, OPENAI_ORGANIZATION, ASSISTANTS_API_KEY, ASSISTANTS_BASE_URL, ASSISTANTS_EXTRA_HEADERS } = process.env;
 
   const userProvidesKey = isUserProvided(ASSISTANTS_API_KEY);
   const userProvidesURL = isUserProvided(ASSISTANTS_BASE_URL);
@@ -33,6 +34,14 @@ const initializeClient = async ({ req, res, endpointOption, version, initAppClie
       'OpenAI-Beta': `assistants=${version}`,
     },
   };
+
+  if (ASSISTANTS_EXTRA_HEADERS) {
+    const headersList = ASSISTANTS_EXTRA_HEADERS.split(',').map(h => h.trim());
+    opts.defaultHeaders = {
+      ...opts.defaultHeaders,
+      ...processExtraHeaders(headersList, req.user),
+    };
+  }
 
   const clientOptions = {
     reverseProxyUrl: baseURL ?? null,
