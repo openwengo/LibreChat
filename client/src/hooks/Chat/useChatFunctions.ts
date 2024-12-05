@@ -6,7 +6,6 @@ import {
   ContentTypes,
   EModelEndpoint,
   parseCompactConvo,
-  replaceSpecialVars,
   isAssistantsEndpoint,
 } from 'librechat-data-provider';
 import { useSetRecoilState, useResetRecoilState, useRecoilValue } from 'recoil';
@@ -28,6 +27,26 @@ import { getEndpointField, logger } from '~/utils';
 import useUserKey from '~/hooks/Input/useUserKey';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '~/hooks';
+
+// Temporary inline implementation until replaceSpecialVars is properly exported
+const replaceSpecialVars = ({ text, user }: { text: string; user?: any }) => {
+  let result = text;
+  if (!result || !user) {
+    return result;
+  }
+  
+  // Replace {{user.name}} with actual user name
+  if (user.name) {
+    result = result.replace(/\{\{user\.name\}\}/g, user.name);
+  }
+  
+  // Replace {{user.email}} with actual user email
+  if (user.email) {
+    result = result.replace(/\{\{user\.email\}\}/g, user.email);
+  }
+  
+  return result;
+};
 
 const logChatRequest = (request: Record<string, unknown>) => {
   logger.log('=====================================\nAsk function called with:');
@@ -130,6 +149,7 @@ export default function useChatFunctions({
 
     let currentMessages: TMessage[] | null = overrideMessages ?? getMessages() ?? [];
 
+    // Check and replace special variables in promptPrefix
     if (conversation?.promptPrefix) {
       conversation.promptPrefix = replaceSpecialVars({
         text: conversation.promptPrefix,
