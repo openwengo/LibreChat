@@ -130,6 +130,7 @@ async function loadActionSets(searchParams) {
  * @param {string | undefined} [params.name] - The name of the tool.
  * @param {string | undefined} [params.description] - The description for the tool.
  * @param {import('zod').ZodTypeAny | undefined} [params.zodSchema] - The Zod schema for tool input validation/definition
+ * @param {Objetct} additionalHeaders - Headers to pass for the action.
  * @returns { Promise<typeof tool | { _call: (toolInput: Object | string) => unknown}> } An object with `_call` method to execute the tool input.
  */
 async function createActionTool({
@@ -140,6 +141,7 @@ async function createActionTool({
   zodSchema,
   name,
   description,
+  additionalHeaders = {},
 }) {
   const isDomainAllowed = await isActionDomainAllowed(action.metadata.domain);
   if (!isDomainAllowed) {
@@ -158,6 +160,7 @@ async function createActionTool({
       const metadata = action.metadata;
       const executor = requestBuilder.createExecutor();
       const preparedExecutor = executor.setParams(toolInput);
+      preparedExecutor.setHeaders(additionalHeaders);
 
       if (metadata.auth && metadata.auth.type !== AuthTypeEnum.None) {
         try {

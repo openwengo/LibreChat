@@ -121,6 +121,11 @@ const conversationPreset = {
   reasoning_effort: {
     type: String,
   },
+  // for google only
+  enableSearch: {
+    type: Boolean,
+    required: false,
+  },
 };
 
 const agentOptions = {

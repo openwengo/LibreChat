@@ -420,6 +420,19 @@ const google: Record<string, SettingDefinition> = {
     optionType: 'model',
     columnSpan: 2,
   },
+  enableSearch:  {
+    key: 'enableSearch',
+    label: 'com_endpoint_google_enable_search',
+    labelCode: true,
+    description: 'com_endpoint_google_search_info',
+    descriptionCode: true,
+    type: 'boolean',
+    default: false,
+    component: 'switch',
+    optionType: 'conversation',
+    showDefault: false,
+    columnSpan: 2,
+  },
 };
 
 const googleConfig: SettingsConfiguration = [
@@ -431,6 +444,7 @@ const googleConfig: SettingsConfiguration = [
   google.topP,
   google.topK,
   librechat.resendFiles,
+  google.enableSearch,
 ];
 
 const googleCol1: SettingsConfiguration = [

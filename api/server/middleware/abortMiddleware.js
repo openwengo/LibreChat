@@ -156,7 +156,7 @@ const handleAbortError = async (res, req, error, data) => {
       message: truncateText(error.message, 350),
     });
   } else {
-    logger.error('[handleAbortError] AI response error; aborting request:', error);
+    logger.error(`[handleAbortError] AI response error; aborting request: ${error.message} , ${error?.stack} ::`, error, error?.stack);
   }
   const { sender, conversationId, messageId, parentMessageId, partialText } = data;
 
