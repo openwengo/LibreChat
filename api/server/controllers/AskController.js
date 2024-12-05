@@ -1,3 +1,4 @@
+const throttle = require('lodash/throttle');
 const { getResponseSender, Constants } = require('librechat-data-provider');
 const { createAbortController, handleAbortError } = require('~/server/middleware');
 const { sendMessage, createOnProgress } = require('~/server/utils');
@@ -26,6 +27,7 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
   let promptTokens;
   let userMessageId;
   let responseMessageId;
+  let currentMetadata = null;
   const sender = getResponseSender({
     ...endpointOption,
     model: endpointOption.modelOptions.model,
@@ -55,7 +57,17 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
 
   try {
     const { client } = await initializeClient({ req, res, endpointOption });
-    const { onProgress: progressCallback, getPartialText } = createOnProgress();
+    const { onProgress: progressCallback, getPartialText } = createOnProgress({
+      onProgress: throttle(
+        ({ text: partialText, metadata }) => {
+          if (metadata) {
+            currentMetadata = metadata;
+          }
+        },
+        3000,
+        { trailing: false },
+      ),
+    });
 
     getText = client.getStreamText != null ? client.getStreamText.bind(client) : getPartialText;
 
@@ -68,6 +80,7 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
       text: getText(),
       userMessage,
       promptTokens,
+      ...(currentMetadata ? { metadata: currentMetadata } : {}),
     });
 
     const { abortController, onStart } = createAbortController(req, res, getAbortData, getReqData);
@@ -105,6 +118,15 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
     let response = await client.sendMessage(text, messageOptions);
     response.endpoint = endpointOption.endpoint;
 
+    // Add metadata to the final response if available
+    if (currentMetadata) {
+      if (currentMetadata.metadata?.groundingMetadata) {
+        response.groundingMetadata = currentMetadata.metadata.groundingMetadata;
+      } else if (currentMetadata.groundingMetadata) {
+        response.groundingMetadata = currentMetadata.groundingMetadata;
+      }
+    }
+
     const { conversation = {} } = await client.responsePromise;
     conversation.title =
       conversation && !conversation.title ? null : conversation?.title || 'New Chat';
@@ -116,19 +138,21 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
     }
 
     if (!abortController.signal.aborted) {
+      const finalResponse = { ...response };
+
       sendMessage(res, {
         final: true,
         conversation,
         title: conversation.title,
         requestMessage: userMessage,
-        responseMessage: response,
+        responseMessage: finalResponse,
       });
       res.end();
 
       if (!client.savedMessageIds.has(response.messageId)) {
         await saveMessage(
           req,
-          { ...response, user },
+          { ...finalResponse, user },
           { context: 'api/server/controllers/AskController.js - response end' },
         );
       }

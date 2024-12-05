@@ -35,6 +35,18 @@ const oauthHandler = async (req, res) => {
   }
 };
 
+/**
+ * Returns the required OAuth scopes for Google authentication
+ * @returns {string[]} Array of OAuth scopes
+ */
+const getGoogleScopes = () => {
+  const scopes = ['openid', 'profile', 'email'];
+  if (process.env.GOOGLE_WORKSPACE_GROUP) {
+    scopes.push('https://www.googleapis.com/auth/cloud-identity.groups.readonly');
+  }
+  return scopes;
+};
+
 router.get('/error', (req, res) => {
   // A single error message is pushed by passport when authentication fails.
   logger.error('Error in OAuth authentication:', { message: req.session.messages.pop() });
@@ -42,14 +54,13 @@ router.get('/error', (req, res) => {
   // Redirect to login page with auth_failed parameter to prevent infinite redirect loops
   res.redirect(`${domains.client}/login?redirect=false`);
 });
-
 /**
  * Google Routes
  */
 router.get(
   '/google',
   passport.authenticate('google', {
-    scope: ['openid', 'profile', 'email'],
+    scope: getGoogleScopes(),
     session: false,
   }),
 );
@@ -60,7 +71,7 @@ router.get(
     failureRedirect: `${domains.client}/oauth/error`,
     failureMessage: true,
     session: false,
-    scope: ['openid', 'profile', 'email'],
+    scope: getGoogleScopes(),
   }),
   setBalanceConfig,
   oauthHandler,

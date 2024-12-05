@@ -252,6 +252,9 @@ export const googleSettings = {
     step: 1 as const,
     default: 40 as const,
   },
+  enableSearch: {
+    default: false,
+  },
 };
 
 const ANTHROPIC_MAX_OUTPUT = 128000 as const;
@@ -498,6 +501,15 @@ export const tMessageSchema = z.object({
   thread_id: z.string().optional(),
   /* frontend components */
   iconURL: z.string().nullable().optional(),
+  /* google grounding metadata */
+  groundingMetadata: z.object({
+    webSearchQueries: z.array(z.string()).optional(),
+    retrievalQueries: z.array(z.string()).optional(),
+    groundingChunks: z.array(z.record(z.any())).optional(),
+    groundingSupports: z.array(z.record(z.any())).optional(),
+    searchEntryPoint: z.record(z.any()).optional(),
+    retrievalMetadata: z.record(z.any()).optional(),
+  }).optional(),
 });
 
 export type TAttachmentMetadata = { messageId: string; toolCallId: string };
@@ -578,6 +590,7 @@ export const tConversationSchema = z.object({
   /* google */
   context: z.string().nullable().optional(),
   examples: z.array(tExampleSchema).optional(),
+  enableSearch: z.boolean().optional(),
   /* DB */
   tags: z.array(z.string()).optional(),
   createdAt: z.string(),
@@ -767,6 +780,7 @@ export const googleSchema = tConversationSchema
     greeting: true,
     spec: true,
     maxContextTokens: true,
+    enableSearch: true,
   })
   .transform((obj: Partial<TConversation>) => removeNullishValues(obj))
   .catch(() => ({}));
@@ -1028,6 +1042,7 @@ export const compactGoogleSchema = tConversationSchema
     greeting: true,
     spec: true,
     maxContextTokens: true,
+    enableSearch: true,
   })
   .transform((obj) => {
     const newObj: Partial<TConversation> = { ...obj };
@@ -1042,6 +1057,9 @@ export const compactGoogleSchema = tConversationSchema
     }
     if (newObj.topK === google.topK.default) {
       delete newObj.topK;
+    }
+    if (newObj.enableSearch === google.enableSearch.default) {
+      delete newObj.enableSearch;
     }
 
     return removeNullishValues(newObj);
@@ -1161,3 +1179,5 @@ export const compactAgentsSchema = tConversationSchema
   })
   .transform((obj) => removeNullishValues(obj))
   .catch(() => ({}));
+
+
