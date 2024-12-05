@@ -128,6 +128,7 @@ async function loadActionSets(searchParams) {
  * @param {string | undefined} [params.description] - The description for the tool.
  * @param {import('zod').ZodTypeAny | undefined} [params.zodSchema] - The Zod schema for tool input validation/definition
  * @param {{ oauth_client_id?: string; oauth_client_secret?: string; }} params.encrypted - The encrypted values for the action.
+ * @param {Objetct} additionalHeaders - Headers to pass for the action.
  * @returns { Promise<typeof tool | { _call: (toolInput: Object | string) => unknown}> } An object with `_call` method to execute the tool input.
  */
 async function createActionTool({
@@ -139,6 +140,7 @@ async function createActionTool({
   name,
   description,
   encrypted,
+  additionalHeaders = {},
 }) {
   /** @type {(toolInput: Object | string, config: GraphRunnableConfig) => Promise<unknown>} */
   const _call = async (toolInput, config) => {
@@ -147,6 +149,7 @@ async function createActionTool({
       const metadata = action.metadata;
       const executor = requestBuilder.createExecutor();
       const preparedExecutor = executor.setParams(toolInput);
+      preparedExecutor.setHeaders(additionalHeaders);
 
       if (metadata.auth && metadata.auth.type !== AuthTypeEnum.None) {
         try {

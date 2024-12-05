@@ -2,8 +2,8 @@ const { google } = require('googleapis');
 const { concat } = require('@langchain/core/utils/stream');
 const { ChatVertexAI } = require('@langchain/google-vertexai');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
-const { GoogleGenerativeAI: GenAI } = require('@google/generative-ai');
-const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
+const { GoogleGenerativeAI: GenAI, DynamicRetrievalMode } = require('@google/generative-ai');
+const { AIMessage, HumanMessage, SystemMessage } = require('@langchain/core/messages');
 const {
   googleGenConfigSchema,
   validateVisionModel,
@@ -31,13 +31,19 @@ const {
   truncateText,
 } = require('./prompts');
 const BaseClient = require('./BaseClient');
-
 const loc = process.env.GOOGLE_LOC || 'us-central1';
 const publisher = 'google';
 const endpointPrefix = `${loc}-aiplatform.googleapis.com`;
 
+
+
 const settings = endpointSettings[EModelEndpoint.google];
 const EXCLUDED_GENAI_MODELS = /gemini-(?:1\.0|1-0|pro)/;
+
+
+const isNewGeminiModel = (model) => {
+  return model.includes('gemini-2.');
+};
 
 class GoogleClient extends BaseClient {
   constructor(credentials, options = {}) {
@@ -135,7 +141,11 @@ class GoogleClient extends BaseClient {
       this.options = options;
     }
 
-    this.modelOptions = this.options.modelOptions || {};
+    // Set modelOptions, ensuring enableSearch is included
+    this.modelOptions = {
+      ...(this.options.modelOptions || {}),
+      enableSearch: this.options.enableSearch,
+    };
 
     this.options.attachments?.then((attachments) => this.checkVisionRequest(attachments));
 
@@ -607,7 +617,29 @@ class GoogleClient extends BaseClient {
       return client;
     } else if (!EXCLUDED_GENAI_MODELS.test(model)) {
       logger.debug('Creating GenAI client');
-      return new GenAI(this.apiKey).getGenerativeModel({ model }, requestOptions);
+      const tools = [];
+      if (this.modelOptions.enableSearch) {
+        logger.debug('[GoogleClient] Adding search tool');
+        if (isNewGeminiModel(model)) {
+          tools.push({
+            googleSearch: {}
+          });
+        } else {
+          tools.push({
+            googleSearchRetrieval: {
+              dynamicRetrievalConfig: {
+                mode: DynamicRetrievalMode.MODE_DYNAMIC,
+                dynamicThreshold: 0.7,
+              },
+            },
+          });
+        }
+      }
+      return new GenAI(this.apiKey).getGenerativeModel({
+        ...clientOptions,
+        model,
+        tools,
+      }, {...requestOptions,...this.options.customHeaders && { 'customHeaders': this.options.customHeaders }});
     }
 
     logger.debug('Creating Chat Google Generative AI client');
@@ -666,6 +698,7 @@ class GoogleClient extends BaseClient {
           };
         }
 
+
         const delay = modelName.includes('flash') ? 8 : 15;
         /** @type {GenAIUsageMetadata} */
         let usageMetadata;
@@ -681,16 +714,30 @@ class GoogleClient extends BaseClient {
         const result = await client.generateContentStream(requestOptions, {
           signal: abortController.signal,
         });
+        let lastGroundingMetadata = null;
+
         for await (const chunk of result.stream) {
           usageMetadata = !usageMetadata
             ? chunk?.usageMetadata
             : Object.assign(usageMetadata, chunk?.usageMetadata);
-          const chunkText = chunk.text();
-          await this.generateTextStream(chunkText, onProgress, {
-            delay,
-          });
-          reply += chunkText;
-          await sleep(streamRate);
+
+          // Get the text content from the first candidate's content parts
+          const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+          // Store the grounding metadata from the last chunk that has it
+          if (chunk.candidates?.[0]?.groundingMetadata) {
+            lastGroundingMetadata = chunk.candidates[0].groundingMetadata;
+          }
+
+          // Only send text content if there is any
+          if (text) {
+            await this.generateTextStream(text, onProgress, {
+              delay,
+              metadata: lastGroundingMetadata ? { groundingMetadata: lastGroundingMetadata } : undefined
+            });
+            reply += text;
+            await sleep(streamRate);
+          }
         }
 
         if (usageMetadata) {
@@ -700,7 +747,25 @@ class GoogleClient extends BaseClient {
           };
         }
 
-        return reply;
+        // Send final completion message with metadata
+        const finalMessage = {
+          text: reply,
+          isComplete: true,
+          metadata: lastGroundingMetadata ? { groundingMetadata: lastGroundingMetadata } : undefined
+        };
+
+        await onProgress(finalMessage);
+
+        // Set metadata for BaseClient to save
+        if (lastGroundingMetadata) {
+          this.metadata = { groundingMetadata: lastGroundingMetadata };
+        }
+
+        return {
+          text: reply,
+          groundingMetadata: lastGroundingMetadata
+        };
+
       }
 
       const { instances } = _payload;
@@ -719,6 +784,7 @@ class GoogleClient extends BaseClient {
         streamUsage: true,
         safetySettings,
       });
+
 
       let delay = this.options.streamRate || 8;
 
@@ -940,10 +1006,25 @@ class GoogleClient extends BaseClient {
   }
 
   async sendCompletion(payload, opts = {}) {
-    let reply = '';
-    reply = await this.getCompletion(payload, opts);
-    return reply.trim();
+    const response = await this.getCompletion(payload, opts);
+
+    // Handle both string and object responses
+    if (typeof response === 'string') {
+      return response.trim();
+    }
+
+    // If response is an object with text and metadata
+    if (response && typeof response === 'object') {
+      const { text, groundingMetadata } = response;
+      if (groundingMetadata) {
+        this.metadata = { groundingMetadata };
+      }
+      return text.trim();
+    }
+
+    return '';
   }
+
 
   getEncoding() {
     return 'cl100k_base';
@@ -977,3 +1058,4 @@ class GoogleClient extends BaseClient {
 }
 
 module.exports = GoogleClient;
+

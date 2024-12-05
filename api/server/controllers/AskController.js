@@ -1,3 +1,4 @@
+const throttle = require('lodash/throttle');
 const { getResponseSender, Constants } = require('librechat-data-provider');
 const {
   handleAbortError,
@@ -42,6 +43,7 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
   let userMessageId = null;
   let responseMessageId = null;
   let getAbortData = null;
+  let currentMetadata = null;
 
   const sender = getResponseSender({
     ...endpointOption,
@@ -72,7 +74,17 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
     userMessageId = reqDataContext.userMessageId;
   };
 
-  let { onProgress: progressCallback, getPartialText } = createOnProgress();
+  let { onProgress: progressCallback, getPartialText } = createOnProgress({
+    onProgress: throttle(
+      ({ text: partialText, metadata }) => {
+        if (metadata) {
+          currentMetadata = metadata;
+        }
+      },
+      3000,
+      { trailing: false },
+    ),
+  });
 
   const performCleanup = () => {
     logger.debug('[AskController] Performing cleanup');
@@ -141,6 +153,7 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
         userMessage: userMessage,
         userMessagePromise: userMessagePromise,
         promptTokens: reqDataContext.promptTokens,
+        ...(currentMetadata ? { metadata: currentMetadata } : {}),
       };
     };
 
@@ -186,6 +199,15 @@ const AskController = async (req, res, next, initializeClient, addTitle) => {
     /** @type {TMessage} */
     let response = await client.sendMessage(text, messageOptions);
     response.endpoint = endpointOption.endpoint;
+
+    // Add metadata to the final response if available
+    if (currentMetadata) {
+      if (currentMetadata.metadata?.groundingMetadata) {
+        response.groundingMetadata = currentMetadata.metadata.groundingMetadata;
+      } else if (currentMetadata.groundingMetadata) {
+        response.groundingMetadata = currentMetadata.groundingMetadata;
+      }
+    }
 
     const databasePromise = response.databasePromise;
     delete response.databasePromise;
