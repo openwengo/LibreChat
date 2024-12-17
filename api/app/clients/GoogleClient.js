@@ -610,7 +610,8 @@ class GoogleClient extends BaseClient {
       return new GenAI(this.apiKey).getGenerativeModel({
         ...clientOptions,
         model,
-      }, {baseUrl: this.options.reverseProxyUrl});
+      }, {baseUrl: this.options.reverseProxyUrl,
+      ...this.options.customHeaders && { 'customHeaders': this.options.customHeaders }});
     }
 
     logger.debug('Creating Chat Google Generative AI client');
