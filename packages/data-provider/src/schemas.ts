@@ -235,6 +235,9 @@ export const googleSettings = {
     step: 1,
     default: 40,
   },
+  enableSearch: {
+    default: false,
+  },
 };
 
 const ANTHROPIC_MAX_OUTPUT = 8192;
@@ -544,6 +547,7 @@ export const tConversationSchema = z.object({
   /* google */
   context: z.string().nullable().optional(),
   examples: z.array(tExampleSchema).optional(),
+  enableSearch: z.boolean().optional(),
   /* DB */
   tags: z.array(z.string()).optional(),
   createdAt: z.string(),
@@ -678,6 +682,7 @@ export const googleSchema = tConversationSchema
     greeting: true,
     spec: true,
     maxContextTokens: true,
+    enableSearch: true,
   })
   .transform((obj) => {
     return {
@@ -690,6 +695,7 @@ export const googleSchema = tConversationSchema
       maxOutputTokens: obj.maxOutputTokens ?? google.maxOutputTokens.default,
       topP: obj.topP ?? google.topP.default,
       topK: obj.topK ?? google.topK.default,
+      enableSearch: obj.enableSearch ?? google.enableSearch.default,
       iconURL: obj.iconURL ?? undefined,
       greeting: obj.greeting ?? undefined,
       spec: obj.spec ?? undefined,
@@ -705,6 +711,7 @@ export const googleSchema = tConversationSchema
     maxOutputTokens: google.maxOutputTokens.default,
     topP: google.topP.default,
     topK: google.topK.default,
+    enableSearch: google.enableSearch.default,
     iconURL: undefined,
     greeting: undefined,
     spec: undefined,
@@ -975,6 +982,7 @@ export const compactGoogleSchema = tConversationSchema
     greeting: true,
     spec: true,
     maxContextTokens: true,
+    enableSearch: true,
   })
   .transform((obj) => {
     const newObj: Partial<TConversation> = { ...obj };
@@ -989,6 +997,9 @@ export const compactGoogleSchema = tConversationSchema
     }
     if (newObj.topK === google.topK.default) {
       delete newObj.topK;
+    }
+    if (newObj.enableSearch === google.enableSearch.default) {
+      delete newObj.enableSearch;
     }
 
     return removeNullishValues(newObj);
@@ -1107,3 +1118,4 @@ export const compactAgentsSchema = tConversationSchema
   })
   .transform(removeNullishValues)
   .catch(() => ({}));
+
