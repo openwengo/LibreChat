@@ -4,6 +4,7 @@ const socialLogin = require('./socialLogin');
 const { logger } = require('~/config');
 
 const getProfileDetails = ({ profile }) => ({
+  
   email: profile.emails[0].value,
   id: profile.id,
   avatarUrl: profile.photos[0].value,
@@ -103,6 +104,7 @@ async function googleLogin(accessToken, refreshToken, profile, done) {
     return socialLogin('google', getProfileDetails)(
       accessToken,
       refreshToken,
+      null,
       profile,
       socialLoginCallback
     );
