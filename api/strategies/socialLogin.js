@@ -32,7 +32,7 @@ const socialLogin =
         return cb(null, newUser);
       }
     } catch (err) {
-      logger.error(`[${provider}Login]`, err);
+      logger.error(`[${provider}Login] ${err.stack}`, err);
       return cb(err);
     }
   };

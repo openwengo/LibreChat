@@ -143,7 +143,7 @@ startServer();
 let messageCount = 0;
 process.on('uncaughtException', (err) => {
   if (!err.message.includes('fetch failed')) {
-    logger.error('There was an uncaught error:', err);
+    logger.error(`There was an uncaught error: ${err.message} / ${err.stack}`, err);
   }
 
   if (err.message.includes('abort')) {
