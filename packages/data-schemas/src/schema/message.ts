@@ -32,6 +32,7 @@ export interface IMessage extends Document {
   thread_id?: string;
   iconURL?: string;
   attachments?: unknown[];
+  groundingMetadata?: unknown[];
   expiredAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -171,6 +172,7 @@ const messageSchema: Schema<IMessage> = new Schema(
       default: undefined,
     },
     */
+    groundingMetadata: { type: mongoose.Schema.Types.Mixed, default: undefined },
     expiredAt: {
       type: Date,
     },
