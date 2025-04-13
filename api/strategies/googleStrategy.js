@@ -1,5 +1,6 @@
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
-const axios = require('axios');
+const { cloudidentity_v1 } = require('@googleapis/cloudidentity');
+const { google } = require('googleapis');
 const socialLogin = require('./socialLogin');
 const { logger } = require('~/config');
 
@@ -14,6 +15,17 @@ const getProfileDetails = ({ profile }) => ({
 });
 
 /**
+ * Creates a Cloud Identity client using OAuth access token
+ * @param {string} accessToken - OAuth access token
+ * @returns {cloudidentity_v1.Cloudidentity} Cloud Identity client
+ */
+function createCloudIdentityClient(accessToken) {
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: accessToken });
+  return new cloudidentity_v1.Cloudidentity({ auth });
+}
+
+/**
  * Retrieves the resource name for a Google Workspace group
  * @param {string} accessToken - OAuth access token
  * @param {string} groupEmail - Email address of the group
@@ -21,20 +33,13 @@ const getProfileDetails = ({ profile }) => ({
  */
 async function getGroupResourceName(accessToken, groupEmail) {
   try {
-    const response = await axios.get(
-      'https://cloudidentity.googleapis.com/v1/groups:lookup',
-      {
-        params: {
-          'groupKey.id': groupEmail,
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const client = createCloudIdentityClient(accessToken);
+    const response = await client.groups.lookup({
+      'groupKey.id': groupEmail,
+    });
     return response.data.name;
   } catch (error) {
-    logger.error('[getGroupResourceName] Error looking up group:', error.response?.data || error);
+    logger.error(`[getGroupResourceName] Error looking up group: ${groupEmail}`, error.response?.data || error);
     return null;
   }
 }
@@ -58,15 +63,11 @@ async function checkGroupMembership(accessToken, userEmail) {
       return false;
     }
 
-    const response = await axios.get(
-      `https://cloudidentity.googleapis.com/v1/${groupName}/memberships:checkTransitiveMembership`,
-      {
-        params: { query: `member_key_id == '${userEmail}'` },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const client = createCloudIdentityClient(accessToken);
+    const response = await client.groups.memberships.checkTransitiveMembership({
+      parent: groupName,
+      query: `member_key_id == '${userEmail}'`,
+    });
 
     return response.data.hasMembership || false;
   } catch (error) {
@@ -91,7 +92,9 @@ async function googleLogin(accessToken, refreshToken, profile, done) {
     const isMember = await checkGroupMembership(accessToken, userEmail);
 
     if (!isMember) {
-      return done(null, false);
+      //return done(null, false, { code: 'GROUP_ACCESS_DENIED', status: 403, message: 'You are not member of the allowed group'});
+      
+      return done(new Error('You are not member of the allowed group'));
     }
 
     const socialLoginCallback = (err, user) => {
@@ -113,13 +116,28 @@ async function googleLogin(accessToken, refreshToken, profile, done) {
   }
 }
 
-module.exports = () =>
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `${process.env.DOMAIN_SERVER}${process.env.GOOGLE_CALLBACK_URL}`,
-      proxy: true,
-    },
-    googleLogin,
-  );
+/**
+ * Returns the required OAuth scopes for Google authentication
+ * @returns {string[]} Array of OAuth scopes
+ */
+const getGoogleScopes = () => {
+  const scopes = ['openid', 'profile', 'email'];
+  if (process.env.GOOGLE_WORKSPACE_GROUP) {
+    scopes.push('https://www.googleapis.com/auth/cloud-identity.groups.readonly');
+  }
+  return scopes;
+};
+
+module.exports = {
+  strategy: () =>
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: `${process.env.DOMAIN_SERVER}${process.env.GOOGLE_CALLBACK_URL}`,
+        proxy: true,
+      },
+      googleLogin,
+    ),
+  getGoogleScopes
+};
