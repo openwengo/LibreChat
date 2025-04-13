@@ -10,6 +10,7 @@ const {
 } = require('~/server/middleware');
 const { setAuthTokens } = require('~/server/services/AuthService');
 const { logger } = require('~/config');
+const { getGoogleScopes } = require('~/strategies/googleStrategy');
 
 const router = express.Router();
 
@@ -35,17 +36,6 @@ const oauthHandler = async (req, res) => {
   }
 };
 
-/**
- * Returns the required OAuth scopes for Google authentication
- * @returns {string[]} Array of OAuth scopes
- */
-const getGoogleScopes = () => {
-  const scopes = ['openid', 'profile', 'email'];
-  if (process.env.GOOGLE_WORKSPACE_GROUP) {
-    scopes.push('https://www.googleapis.com/auth/cloud-identity.groups.readonly');
-  }
-  return scopes;
-};
 
 router.get('/error', (req, res) => {
   // A single error message is pushed by passport when authentication fails.
