@@ -5,7 +5,6 @@ const socialLogin = require('./socialLogin');
 const { logger } = require('~/config');
 
 const getProfileDetails = ({ profile }) => ({
-  
   email: profile.emails[0].value,
   id: profile.id,
   avatarUrl: profile.photos[0].value,
@@ -73,7 +72,7 @@ async function checkGroupMembership(accessToken, userEmail) {
   } catch (error) {
     logger.error(
       '[checkGroupMembership] Error checking group membership:',
-      { userEmail, error: error.response?.data || error }
+      { userEmail, error: error.response?.data || error },
     );
     return false;
   }
@@ -88,20 +87,12 @@ async function checkGroupMembership(accessToken, userEmail) {
  */
 async function googleLogin(accessToken, refreshToken, profile, done) {
   try {
-    const userEmail = profile.emails[0].value;
-    const isMember = await checkGroupMembership(accessToken, userEmail);
-
-    if (!isMember) {
-      //return done(null, false, { code: 'GROUP_ACCESS_DENIED', status: 403, message: 'You are not member of the allowed group'});
-      
-      return done(new Error('You are not member of the allowed group'));
-    }
-
+    // Group membership check is moved to middleware
     const socialLoginCallback = (err, user) => {
       if (err) {
         return done(err);
       }
-      done(null, user);
+      done(null, user, { accessToken });
     };
 
     return socialLogin('google', getProfileDetails)(
@@ -109,9 +100,10 @@ async function googleLogin(accessToken, refreshToken, profile, done) {
       refreshToken,
       null,
       profile,
-      socialLoginCallback
+      socialLoginCallback,
     );
   } catch (error) {
+    logger.error('[googleLogin] Error processing Google login:', error);
     return done(error);
   }
 }
@@ -139,5 +131,6 @@ module.exports = {
       },
       googleLogin,
     ),
-  getGoogleScopes
+  getGoogleScopes,
+  checkGroupMembership,
 };

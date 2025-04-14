@@ -7,6 +7,7 @@ const {
   loginLimiter,
   setBalanceConfig,
   checkDomainAllowed,
+  verifyGoogleGroupMembership,
 } = require('~/server/middleware');
 const { setAuthTokens } = require('~/server/services/AuthService');
 const { logger } = require('~/config');
@@ -36,7 +37,6 @@ const oauthHandler = async (req, res) => {
   }
 };
 
-
 router.get('/error', (req, res) => {
   // A single error message is pushed by passport when authentication fails.
   logger.error('Error in OAuth authentication:', { message: req.session.messages.pop() });
@@ -63,6 +63,7 @@ router.get(
     session: false,
     scope: getGoogleScopes(),
   }),
+  verifyGoogleGroupMembership,
   setBalanceConfig,
   oauthHandler,
 );
