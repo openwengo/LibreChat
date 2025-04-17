@@ -354,7 +354,6 @@ function BadgeRow({
       )}
       {showEphemeralBadges === true && (
         <>
-          <CodeInterpreter conversationId={conversationId} />
           <MCPSelect conversationId={conversationId} />
         </>
       )}
