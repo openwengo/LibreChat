@@ -106,6 +106,10 @@ const getImageEditPromptDescription = () => {
   return process.env.IMAGE_EDIT_OAI_PROMPT_DESCRIPTION || DEFAULT_IMAGE_EDIT_PROMPT_DESCRIPTION;
 };
 
+const getImageGenOAITimeout = () => {
+  return parseInt(process.env.IMAGE_GEN_OAI_TIMEOUT_MS || '120000', 10); // Default to 2 minutes
+};
+
 /**
  * Creates OpenAI Image tools (generation and editing)
  * @param {Object} fields - Configuration fields
@@ -220,6 +224,7 @@ function createOpenAIImageTools(fields = {}) {
           },
           {
             signal: derivedSignal,
+            timeout: getImageGenOAITimeout(),
           },
         );
       } catch (error) {
@@ -419,6 +424,7 @@ Error Message: ${error.message}`);
           ...clientConfig,
           signal: derivedSignal,
           baseURL,
+          timeout: getImageGenOAITimeout(),
         };
 
         if (process.env.IMAGE_GEN_OAI_AZURE_API_VERSION && process.env.IMAGE_GEN_OAI_BASEURL) {
