@@ -6,6 +6,7 @@ import {
   ContentTypes,
   EModelEndpoint,
   parseCompactConvo,
+  replaceSpecialVars,
   isAssistantsEndpoint,
 } from 'librechat-data-provider';
 import { useSetRecoilState, useResetRecoilState, useRecoilValue } from 'recoil';
@@ -27,26 +28,6 @@ import { getEndpointField, logger } from '~/utils';
 import useUserKey from '~/hooks/Input/useUserKey';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '~/hooks';
-
-// Temporary inline implementation until replaceSpecialVars is properly exported
-const replaceSpecialVars = ({ text, user }: { text: string; user?: any }) => {
-  let result = text;
-  if (!result || !user) {
-    return result;
-  }
-  
-  // Replace {{user.name}} with actual user name
-  if (user.name) {
-    result = result.replace(/\{\{user\.name\}\}/g, user.name);
-  }
-  
-  // Replace {{user.email}} with actual user email
-  if (user.email) {
-    result = result.replace(/\{\{user\.email\}\}/g, user.email);
-  }
-  
-  return result;
-};
 
 const logChatRequest = (request: Record<string, unknown>) => {
   logger.log('=====================================\nAsk function called with:');
@@ -149,12 +130,16 @@ export default function useChatFunctions({
 
     let currentMessages: TMessage[] | null = overrideMessages ?? getMessages() ?? [];
 
-    // Check and replace special variables in promptPrefix
+    // Create a copy of conversation to avoid mutating read-only object
+    let workingConversation = conversation;
     if (conversation?.promptPrefix) {
-      conversation.promptPrefix = replaceSpecialVars({
-        text: conversation.promptPrefix,
-        user,
-      });
+      workingConversation = {
+        ...conversation,
+        promptPrefix: replaceSpecialVars({
+          text: conversation.promptPrefix,
+          user,
+        }),
+      };
     }
 
     // construct the query message
@@ -202,7 +187,7 @@ export default function useChatFunctions({
     const convo = parseCompactConvo({
       endpoint: endpoint as EndpointSchemaKey,
       endpointType: endpointType as EndpointSchemaKey,
-      conversation: conversation ?? {},
+      conversation: workingConversation ?? {},
     });
 
     const { modelDisplayLabel } = endpointsConfig?.[endpoint ?? ''] ?? {};
@@ -226,7 +211,7 @@ export default function useChatFunctions({
     } else {
       endpointOption.key = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     }
-    const responseSender = getSender({ model: conversation?.model, ...endpointOption });
+    const responseSender = getSender({ model: workingConversation?.model, ...endpointOption });
 
     const currentMsg: TMessage = {
       text,
@@ -283,7 +268,7 @@ export default function useChatFunctions({
     };
 
     if (isAssistantsEndpoint(endpoint)) {
-      initialResponse.model = conversation?.assistant_id ?? '';
+      initialResponse.model = workingConversation?.assistant_id ?? '';
       initialResponse.text = '';
       initialResponse.content = [
         {
@@ -294,7 +279,7 @@ export default function useChatFunctions({
         },
       ];
     } else if (endpoint === EModelEndpoint.agents) {
-      initialResponse.model = conversation?.agent_id ?? '';
+      initialResponse.model = workingConversation?.agent_id ?? '';
       initialResponse.text = '';
       initialResponse.content = [
         {
@@ -327,7 +312,7 @@ export default function useChatFunctions({
     logger.log('message_state', initialResponse);
     const submission: TSubmission = {
       conversation: {
-        ...conversation,
+        ...workingConversation,
         conversationId,
       },
       endpointOption,
