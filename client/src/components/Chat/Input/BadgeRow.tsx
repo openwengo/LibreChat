@@ -15,7 +15,6 @@ import type { BadgeItem } from '~/common';
 import { useChatBadges } from '~/hooks';
 import { Badge } from '~/components/ui';
 import MCPSelect from './MCPSelect';
-import WebSearch from './WebSearch';
 import store from '~/store';
 
 interface BadgeRowProps {
@@ -355,7 +354,6 @@ function BadgeRow({
       )}
       {showEphemeralBadges === true && (
         <>
-          <WebSearch conversationId={conversationId} />
           <MCPSelect conversationId={conversationId} />
         </>
       )}
