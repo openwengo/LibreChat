@@ -454,6 +454,21 @@ class BaseClient {
     }
 
     let orderedWithInstructions = this.addInstructions(orderedMessages, instructions);
+    if (this.clientName === EModelEndpoint.agents) {
+      const { dbMessages, editedIndices } = truncateToolCallOutputs(
+        orderedWithInstructions,
+        this.maxContextTokens,
+        this.getTokenCountForMessage.bind(this),
+      );
+
+      if (editedIndices.length > 0) {
+        logger.debug('[BaseClient] Truncated tool call outputs:', editedIndices);
+        for (const index of editedIndices) {
+          payload[index].content = dbMessages[index].content;
+        }
+        orderedWithInstructions = dbMessages;
+      }
+    }
 
     let { context, remainingContextTokens, messagesToRefine } =
       await this.getMessagesWithinTokenLimit({
