@@ -143,5 +143,8 @@
       "admin/",
       "packages/"
     ]
+  },
+  "dependencies": {
+    "@googleapis/cloudidentity": "^16.1.0"
   }
 }
