@@ -620,7 +620,11 @@ class GoogleClient extends BaseClient {
       return client;
     } else if (!EXCLUDED_GENAI_MODELS.test(model)) {
       logger.debug('Creating GenAI client');
-      return new GenAI(this.apiKey).getGenerativeModel({ model }, requestOptions);
+
+      return new GenAI(this.apiKey).getGenerativeModel({
+        ...clientOptions,
+        model,
+      }, {...requestOptions,...this.options.customHeaders && { 'customHeaders': this.options.customHeaders }});
     }
 
     logger.debug('Creating Chat Google Generative AI client');
@@ -990,3 +994,4 @@ class GoogleClient extends BaseClient {
 }
 
 module.exports = GoogleClient;
+
