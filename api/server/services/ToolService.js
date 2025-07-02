@@ -226,6 +226,7 @@ async function processRequiredActions(client, requiredActions) {
     `[required actions] user: ${client.req.user.id} | thread_id: ${requiredActions[0].thread_id} | run_id: ${requiredActions[0].run_id}`,
     requiredActions,
   );
+  const threadId = requiredActions[0].thread_id;
   const toolDefinitions = await getCachedTools({ userId: client.req.user.id, includeGlobal: true });
   const seenToolkits = new Set();
   const tools = requiredActions
@@ -437,6 +438,16 @@ async function processRequiredActions(client, requiredActions) {
         continue;
       }
 
+      // Initialize an object to hold additional headers
+      let additionalHeaders = {};
+
+      // Detect if "x-openai-thread-id" is required for this operation
+      if (requestBuilder.requiredHeaders.includes('x-openai-thread-id')) {
+        additionalHeaders = {
+          'x-openai-thread-id': threadId,
+        };
+      }
+
       // We've already decrypted the metadata, so we can pass it directly
       tool = await createActionTool({
         userId: client.req.user.id,
@@ -445,6 +456,7 @@ async function processRequiredActions(client, requiredActions) {
         requestBuilder,
         // Note: intentionally not passing zodSchema, name, and description for assistants API
         encrypted, // Pass the encrypted values for OAuth flow
+        additionalHeaders,
       });
       if (!tool) {
         logger.warn(
