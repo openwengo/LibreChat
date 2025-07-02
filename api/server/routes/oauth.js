@@ -11,7 +11,12 @@ const {
   getOAuthFailureMessage,
   redirectToAuthFailure,
 } = require('@librechat/api');
-const { checkDomainAllowed, loginLimiter, logHeaders } = require('~/server/middleware');
+const {
+  checkDomainAllowed,
+  loginLimiter,
+  logHeaders,
+  verifyGoogleGroupMembership,
+} = require('~/server/middleware');
 const { createOAuthHandler } = require('~/server/controllers/auth/oauth');
 const { findBalanceByUser, upsertBalanceFields } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
@@ -59,14 +64,13 @@ router.get('/error', (req, res) => {
 
   redirectToAuthFailure(res, authFailureRedirectOptions);
 });
-
 /**
  * Google Routes
  */
 router.get(
   '/google',
   passport.authenticate('google', {
-    scope: ['openid', 'profile', 'email'],
+    scope: getGoogleScopes(),
     session: false,
   }),
 );
@@ -77,8 +81,9 @@ router.get(
     failureRedirect: `${domains.client}/oauth/error`,
     failureMessage: true,
     session: false,
-    scope: ['openid', 'profile', 'email'],
+    scope: getGoogleScopes(),
   }),
+  verifyGoogleGroupMembership,
   setBalanceConfig,
   checkDomainAllowed,
   oauthHandler,

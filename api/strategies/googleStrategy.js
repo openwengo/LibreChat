@@ -1,5 +1,7 @@
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
+const { cloudidentity_v1, auth } = require('@googleapis/cloudidentity');
 const socialLogin = require('./socialLogin');
+const { logger } = require('~/config');
 
 const getProfileDetails = ({ profile }) => ({
   email: profile.emails[0].value,
