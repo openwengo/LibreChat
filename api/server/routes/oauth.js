@@ -16,10 +16,12 @@ const {
   loginLimiter,
   logHeaders,
   markOAuthNavigation,
+  verifyGoogleGroupMembership,
 } = require('~/server/middleware');
 const { createOAuthHandler } = require('~/server/controllers/auth/oauth');
 const { findBalanceByUser, upsertBalanceFields } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
+const { getGoogleScopes } = require('~/strategies/googleStrategy');
 
 const setBalanceConfig = createSetBalanceConfig({
   getAppConfig,
@@ -72,7 +74,7 @@ router.get('/error', (req, res) => {
 router.get(
   '/google',
   passport.authenticate('google', {
-    scope: ['openid', 'profile', 'email'],
+    scope: getGoogleScopes(),
     session: false,
   }),
 );
@@ -82,8 +84,9 @@ router.get(
   passport.authenticate('google', {
     failureRedirect: `${domains.client}/oauth/error`,
     session: false,
-    scope: ['openid', 'profile', 'email'],
+    scope: getGoogleScopes(),
   }),
+  verifyGoogleGroupMembership,
   setBalanceConfig,
   checkDomainAllowed,
   oauthHandler,

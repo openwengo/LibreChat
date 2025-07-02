@@ -56,6 +56,7 @@ module.exports = {
   canDeleteAccount,
   configMiddleware,
   checkDomainAllowed,
+  verifyGoogleGroupMembership: require('./checkGoogleGroup'),
   validateMessageReq,
   canReadActiveJobConversation,
   sendValidationResponse,
