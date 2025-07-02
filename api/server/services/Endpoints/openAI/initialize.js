@@ -9,6 +9,7 @@ const {
 } = require('@librechat/api');
 const { getUserKeyValues, checkUserKeyExpiry } = require('~/server/services/UserService');
 const OpenAIClient = require('~/app/clients/OpenAIClient');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 
 const initializeClient = async ({
   req,
@@ -26,6 +27,7 @@ const initializeClient = async ({
     AZURE_OPENAI_BASEURL,
     OPENAI_SUMMARIZE,
     DEBUG_OPENAI,
+    OPENAI_EXTRA_HEADERS,
   } = process.env;
   const { key: expiresAt } = req.body;
   const modelName = overrideModel ?? req.body.model;
@@ -61,6 +63,14 @@ const initializeClient = async ({
     reverseProxyUrl: baseURL ? baseURL : null,
     ...endpointOption,
   };
+
+  if (OPENAI_EXTRA_HEADERS) {
+    const headersList = OPENAI_EXTRA_HEADERS.split(',').map(h => h.trim());
+    clientOptions.headers = resolveHeaders({
+      ...(clientOptions.headers ?? {}),
+      ...processExtraHeaders(headersList, req.user),
+    });
+  }
 
   const isAzureOpenAI = endpoint === EModelEndpoint.azureOpenAI;
   /** @type {false | TAzureConfig} */

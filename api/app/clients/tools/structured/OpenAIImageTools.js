@@ -11,6 +11,7 @@ const { ContentTypes, EImageOutputType } = require('librechat-data-provider');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { extractBaseURL } = require('~/utils');
 const { getFiles } = require('~/models/File');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 
 /** Default descriptions for image generation tool  */
 const DEFAULT_IMAGE_GEN_DESCRIPTION = `
@@ -165,6 +166,15 @@ function createOpenAIImageTools(fields = {}) {
       'Content-Type': 'application/json',
     };
     closureConfig.apiKey = process.env.IMAGE_GEN_OAI_API_KEY;
+  }
+
+  if (process.env.IMAGE_GEN_OAI_EXTRA_HEADERS && req?.user) {
+    const headersList = process.env.IMAGE_GEN_OAI_EXTRA_HEADERS.split(',').map((h) => h.trim());
+    const extraHeaders = processExtraHeaders(headersList, req.user);
+    closureConfig.defaultHeaders = {
+      ...(closureConfig.defaultHeaders || {}),
+      ...extraHeaders,
+    };
   }
 
   const imageFiles = fields.imageFiles ?? [];
@@ -425,6 +435,7 @@ Error Message: ${error.message}`);
       /** @type {import('axios').RawAxiosHeaders} */
       let headers = {
         ...formData.getHeaders(),
+        ...(clientConfig.defaultHeaders || {}),
       };
 
       if (process.env.IMAGE_GEN_OAI_AZURE_API_VERSION && process.env.IMAGE_GEN_OAI_BASEURL) {
