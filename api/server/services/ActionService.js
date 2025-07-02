@@ -133,6 +133,7 @@ async function loadActionSets(searchParams) {
  * @param {string | undefined} [params.description] - The description for the tool.
  * @param {import('zod').ZodTypeAny | undefined} [params.zodSchema] - The Zod schema for tool input validation/definition
  * @param {{ oauth_client_id?: string; oauth_client_secret?: string; }} params.encrypted - The encrypted values for the action.
+ * @param {Object} [params.additionalHeaders] - Headers to pass for the action.
  * @param {string | null} [params.streamId] - The stream ID for resumable streams.
  * @param {boolean} [params.useSSRFProtection] - When true, uses SSRF-safe HTTP agents that validate resolved IPs at connect time.
  * @returns { Promise<typeof tool | { _call: (toolInput: Object | string) => unknown}> } An object with `_call` method to execute the tool input.
@@ -146,6 +147,7 @@ async function createActionTool({
   name,
   description,
   encrypted,
+  additionalHeaders = {},
   streamId = null,
   useSSRFProtection = false,
 }) {
@@ -157,6 +159,7 @@ async function createActionTool({
       const metadata = action.metadata;
       const executor = requestBuilder.createExecutor();
       const preparedExecutor = executor.setParams(toolInput ?? {});
+      preparedExecutor.setHeaders(additionalHeaders);
 
       if (metadata.auth && metadata.auth.type !== AuthTypeEnum.None) {
         try {
