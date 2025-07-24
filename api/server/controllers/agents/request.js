@@ -340,6 +340,7 @@ function getAgentResponseModel(req, endpointOption) {
 }
 
 async function finishResumableRequest(req, userId) {
+  req._cleanupMCPElicitation?.();
   try {
     await cleanupMCPRequestContextForReq(req);
   } finally {
@@ -1781,6 +1782,13 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     }
     acceptAgentStartupTelemetry(req, streamId);
     startupTelemetry?.mark('metadata_persisted');
+    req._cleanupMCPElicitation = getMCPManager().subscribeToElicitations(userId, (state) => {
+      GenerationJobManager.emitChunk(streamId, {
+        type: 'elicitation_created',
+        elicitationData: state,
+        timestamp: Date.now(),
+      });
+    });
     req._resumableStreamId = streamId;
     getMCPRequestContext(req, undefined, { cleanupOnResponse: false });
     let recoveredSteerCommitted = false;

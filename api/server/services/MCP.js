@@ -1328,6 +1328,7 @@ function createToolInstance({
         toolArguments,
         options: {
           signal: derivedSignal,
+          tool_call_id: config?.toolCall?.id,
         },
         user: effectiveUser,
         requestBody: config?.configurable?.requestBody ?? capturedRequestBody,

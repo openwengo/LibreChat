@@ -26,6 +26,7 @@ import * as config from './config';
 import request from './request';
 import * as s from './schemas';
 import * as r from './roles';
+import * as mc from './types/mcp';
 
 export function getInsights(params: TInsightsParams = {}): Promise<TInsightsResponse> {
   const query = new URLSearchParams();
@@ -1657,4 +1658,11 @@ export interface ActiveJobsResponse {
 
 export const getActiveJobs = (): Promise<ActiveJobsResponse> => {
   return request.get(endpoints.activeJobs());
+};
+
+export const respondToElicitation = (
+  elicitationId: string,
+  response: mc.ElicitationResponse,
+): Promise<{ success: boolean; message: string }> => {
+  return request.post(`/api/mcp/elicitations/${elicitationId}/respond`, response);
 };

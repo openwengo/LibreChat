@@ -1,4 +1,6 @@
 import pick from 'lodash/pick';
+import { EventEmitter } from 'events';
+import type { ElicitationState, ElicitationResponse } from 'librechat-data-provider';
 import { logger } from '@librechat/data-schemas';
 import { Permissions, PermissionTypes } from 'librechat-data-provider';
 import { CallToolResultSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -99,6 +101,10 @@ function getDiscoveryAuthenticationKind(
  */
 export class MCPManager extends UserConnectionManager {
   private static instance: MCPManager | null;
+  private eventEmitter: EventEmitter = new EventEmitter();
+  private elicitationStates: Map<string, ElicitationState> = new Map();
+  private pendingElicitations: Map<string, (response: unknown) => void> = new Map();
+  private handlerSetupMap: Map<MCPConnection, string> = new Map();
   private readonly catalogRecoveryTracker: MCPServerCatalogRecoveryTracker;
   private readonly recoveryCancellation = new WeakMap<
     Promise<void>,
@@ -1144,6 +1150,7 @@ Please follow these instructions when using tools from the respective MCP server
     onOAuthCredentialsChanged?: t.UserConnectionContext['onOAuthCredentialsChanged'];
     onOAuthCredentialsChanging?: t.UserConnectionContext['onOAuthCredentialsChanging'];
   }): Promise<t.FormattedToolResponse> {
+    const toolCallId = (options as t.LibreChatRequestOptions)?.tool_call_id;
     const userId = user?.id;
     const logPrefix = userId ? `[MCP][User: ${userId}][${serverName}]` : `[MCP][${serverName}]`;
     this.bindRequestScopedConnectionStore(requestScopedConnections);
@@ -1426,6 +1433,8 @@ Please follow these instructions when using tools from the respective MCP server
             );
         }
 
+        this.setupConnectionElicitationHandler(connection, serverName, userId);
+        connection.setCurrentToolCallId(toolCallId);
         connection.setRequestHeaders(resolvedHeaders);
 
         const checkedCredentialSetId = connection.getOAuthCredentialSetId?.();
@@ -1656,6 +1665,7 @@ Please follow these instructions when using tools from the respective MCP server
         // Rethrowing allows the caller (createMCPTool) to handle the final user message
         throw error;
       } finally {
+        connection?.clearCurrentToolCallId();
         await releaseConnectionLease();
         // Ephemeral connections are never stored in userConnections, so disposing
         // is the only cleanup needed; removing the map entry here could orphan a
@@ -1669,4 +1679,148 @@ Please follow these instructions when using tools from the respective MCP server
       }
     }
   }
+  subscribeToElicitations(userId: string, listener: (state: ElicitationState) => void): () => void {
+    const onCreated = (event: { elicitationId: string; userId: string }): void => {
+      const state = this.getElicitationState(event.elicitationId);
+      if (event.userId === userId && state) {
+        listener(state);
+      }
+    };
+    this.eventEmitter.on('elicitationCreated', onCreated);
+    return () => { this.eventEmitter.removeListener('elicitationCreated', onCreated); };
+  }
+
+  on(event: string, listener: (...args: unknown[]) => void): this {
+    this.eventEmitter.on(event, listener);
+    return this;
+  }
+
+  removeListener(event: string, listener: (...args: unknown[]) => void): this {
+    this.eventEmitter.removeListener(event, listener);
+    return this;
+  }
+
+  emit(event: string, ...args: unknown[]): boolean {
+    return this.eventEmitter.emit(event, ...args);
+  }
+
+  getElicitationState(elicitationId: string): ElicitationState | undefined {
+    return this.elicitationStates.get(elicitationId);
+  }
+
+  setElicitationState(elicitationId: string, state: ElicitationState): void {
+    this.elicitationStates.set(elicitationId, state);
+    const eventData = {
+      elicitationId,
+      userId: state.userId,
+      serverName: state.serverName,
+    };
+    logger.info(`[MCP] Emitting elicitationCreated event:`, eventData);
+    this.emit('elicitationCreated', eventData);
+  }
+
+  respondToElicitation(elicitationId: string, response: ElicitationResponse): boolean {
+    const state = this.elicitationStates.get(elicitationId);
+    const resolver = this.pendingElicitations.get(elicitationId);
+
+    if (!state) {
+      logger.warn(`[MCP] Elicitation ${elicitationId} not found`);
+      return false;
+    }
+
+    try {
+      if (resolver) {
+        resolver(response);
+        this.pendingElicitations.delete(elicitationId);
+      }
+
+      this.elicitationStates.delete(elicitationId);
+      logger.info(
+        `[MCP] Responded to elicitation ${elicitationId} with action: ${response.action}`,
+      );
+      return true;
+    } catch (error) {
+      logger.error(`[MCP] Error responding to elicitation ${elicitationId}:`, error);
+      return false;
+    }
+  }
+
+  cleanupExpiredElicitations(maxAge: number = 30 * 60 * 1000): void {
+    const now = Date.now();
+    for (const [id, state] of this.elicitationStates.entries()) {
+      if (now - state.timestamp > maxAge) {
+        this.elicitationStates.delete(id);
+        logger.debug(`[MCP] Cleaned up expired elicitation ${id}`);
+      }
+    }
+  }
+
+  private setupConnectionElicitationHandler(
+    connection: MCPConnection,
+    serverName: string,
+    contextUserId?: string,
+  ): void {
+    const existingUserId = this.handlerSetupMap.get(connection);
+    if (existingUserId === contextUserId) {
+      return;
+    }
+
+    connection.removeAllListeners('elicitationRequest');
+
+    if (contextUserId) {
+      this.handlerSetupMap.set(connection, contextUserId);
+    }
+
+    connection.on(
+      'elicitationRequest',
+      (eventData: {
+        serverName: string;
+        userId: string;
+        request: unknown;
+        resolve: (response: unknown) => void;
+        context: { tool_call_id?: string };
+      }) => {
+        const effectiveUserId = eventData.userId || contextUserId;
+
+        if (!effectiveUserId) {
+          logger.warn(`[MCP][${serverName}] No userId available for elicitation request, skipping`);
+          return;
+        }
+
+        logger.info(
+          `[MCP][${serverName}] Received elicitation request for user ${effectiveUserId} (original: ${eventData.userId}, context: ${contextUserId})`,
+        );
+        logger.info(`[MCP][${serverName}] Event context:`, eventData.context);
+
+        const elicitationId = `${serverName}_${effectiveUserId}_${Date.now()}`;
+        const toolCallIdFromEvent = eventData.context?.tool_call_id;
+
+        logger.info(`[MCP][${serverName}] Tool call ID: ${toolCallIdFromEvent}`);
+
+        const elicitationState: ElicitationState = {
+          id: elicitationId,
+          serverName: eventData.serverName,
+          userId: effectiveUserId,
+          request: eventData.request as ElicitationState['request'],
+          timestamp: Date.now(),
+          tool_call_id: toolCallIdFromEvent,
+        };
+
+        logger.info(`[MCP][${serverName}] Created elicitation state:`, elicitationState);
+
+        this.pendingElicitations.set(elicitationId, eventData.resolve);
+
+        logger.info(
+          `[MCP][${serverName}] Storing elicitation state and emitting elicitationCreated event for user ${effectiveUserId}`,
+        );
+
+        this.setElicitationState(elicitationId, elicitationState);
+      },
+    );
+
+    logger.debug(
+      `[MCP][${serverName}] Set up elicitation handler for connection with contextUserId: ${contextUserId}`,
+    );
+  }
+
 }

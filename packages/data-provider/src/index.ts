@@ -17,6 +17,7 @@ export * from './runSteps';
 export * from './artifacts';
 /* schema helpers  */
 export * from './parsers';
+export * from './schemas';
 /* custom/dynamic configurations  */
 export * from './generate';
 export * from './models';
@@ -47,6 +48,7 @@ export * from './types/subagents';
 export * from './types/queuedTurns';
 /* access permissions */
 export * from './accessPermissions';
+export * from './types/mcp';
 /* query/mutation keys */
 export * from './keys';
 /* api call helpers */
@@ -60,6 +62,7 @@ export {
 } from './api-endpoints';
 export { default as request } from './request';
 export { dataService };
+export { respondToElicitation } from './data-service';
 import * as dataService from './data-service';
 /* provider identity */
 export * from './providers';
