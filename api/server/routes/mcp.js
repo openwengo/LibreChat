@@ -45,6 +45,7 @@ const { reinitMCPServer } = require('~/server/services/Tools/mcp');
 const { findPluginAuthsByKeys } = require('~/models');
 const { getRoleByName } = require('~/models/Role');
 const { getLogStores } = require('~/cache');
+const elicitationRouter = require('./mcp/elicitation');
 
 const router = Router();
 
@@ -784,5 +785,8 @@ router.delete(
   }),
   deleteMCPServerController,
 );
+
+// Mount elicitation routes
+router.use('/elicitations', elicitationRouter);
 
 module.exports = router;
