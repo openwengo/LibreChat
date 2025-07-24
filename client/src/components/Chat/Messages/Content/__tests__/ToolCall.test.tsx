@@ -2,7 +2,9 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { RecoilRoot } from 'recoil';
 import { Tools } from 'librechat-data-provider';
+import type { ElicitationState } from 'librechat-data-provider';
 import ToolCall from '../ToolCall';
+import { activeElicitationsState, elicitationDataState } from '~/store';
 
 // Mock dependencies
 jest.mock('~/hooks', () => ({
@@ -33,6 +35,15 @@ jest.mock('../ToolCallInfo', () => ({
   default: ({ attachments, ...props }: any) => (
     <div data-testid="tool-call-info" data-attachments={JSON.stringify(attachments)}>
       {JSON.stringify(props)}
+    </div>
+  ),
+}));
+
+jest.mock('../ElicitationForm', () => ({
+  __esModule: true,
+  default: ({ serverName, request }: any) => (
+    <div data-testid="elicitation-form">
+      {serverName}:{request.message}
     </div>
   ),
 }));
@@ -80,8 +91,11 @@ describe('ToolCall', () => {
     isSubmitting: false,
   };
 
-  const renderWithRecoil = (component: React.ReactElement) => {
-    return render(<RecoilRoot>{component}</RecoilRoot>);
+  const renderWithRecoil = (
+    component: React.ReactElement,
+    initializeState?: Parameters<typeof RecoilRoot>[0]['initializeState'],
+  ) => {
+    return render(<RecoilRoot initializeState={initializeState}>{component}</RecoilRoot>);
   };
 
   beforeEach(() => {
@@ -186,6 +200,42 @@ describe('ToolCall', () => {
       renderWithRecoil(<ToolCall {...mockProps} attachments={[]} />);
 
       expect(screen.queryByTestId('attachment-group')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('elicitation rendering', () => {
+    it('should render the elicitation form when the tool_call_id has an active elicitation', () => {
+      const toolCallId = 'tool-call-123';
+      const elicitation: ElicitationState = {
+        id: 'elicitation-1',
+        serverName: 'iframe-mcp',
+        userId: 'user-123',
+        tool_call_id: toolCallId,
+        timestamp: Date.now(),
+        request: {
+          message: 'Need additional input',
+          requestedSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+      };
+
+      renderWithRecoil(<ToolCall {...mockProps} tool_call_id={toolCallId} />, ({ set }) => {
+        set(activeElicitationsState, {
+          [toolCallId]: {
+            id: elicitation.id,
+            tool_call_id: toolCallId,
+            timestamp: elicitation.timestamp,
+          },
+        });
+        set(elicitationDataState, {
+          [elicitation.id]: elicitation,
+        });
+      });
+
+      expect(screen.getByTestId('elicitation-form')).toBeInTheDocument();
+      expect(screen.getByText('iframe-mcp:Need additional input')).toBeInTheDocument();
     });
   });
 
