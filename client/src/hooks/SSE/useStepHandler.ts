@@ -284,6 +284,22 @@ export default function useStepHandler({
     [],
   );
 
+  const resolveToolCallId = useCallback(
+    (
+      toolCall: Partial<Agents.ToolCall> & {
+        tool_call_id?: string;
+        tool_call_ids?: string[];
+      },
+      fallbackId?: string,
+    ): string =>
+      getNonEmptyValue(
+        [toolCall?.id, toolCall?.tool_call_id, toolCall?.tool_call_ids?.[0], fallbackId].filter(
+          (value): value is string => typeof value === 'string',
+        ),
+      ) ?? '',
+    [],
+  );
+
   /**
    * Calculate content index for a run step.
    * For edited content scenarios, offset by initialContent length.
@@ -680,8 +696,8 @@ export default function useStepHandler({
         if (runStep.stepDetails.type === StepTypes.TOOL_CALLS) {
           let updatedResponse = { ...response };
           (runStep.stepDetails.tool_calls as Agents.ToolCall[]).forEach((toolCall) => {
-            const toolCallId = toolCall.id ?? '';
-            if ('id' in toolCall && toolCallId) {
+            const toolCallId = resolveToolCallId(toolCall);
+            if (toolCallId) {
               toolCallIdMap.current.set(runStep.id, toolCallId);
             }
 
@@ -896,7 +912,13 @@ export default function useStepHandler({
           let updatedResponse = { ...response };
 
           runStepDelta.delta.tool_calls.forEach((toolCallDelta) => {
-            const toolCallId = toolCallIdMap.current.get(runStepDelta.id) ?? '';
+            const toolCallId = resolveToolCallId(
+              toolCallDelta as unknown as Agents.ToolCall,
+              toolCallIdMap.current.get(runStepDelta.id),
+            );
+            if (toolCallId && !toolCallIdMap.current.has(runStepDelta.id)) {
+              toolCallIdMap.current.set(runStepDelta.id, toolCallId);
+            }
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -1083,6 +1105,7 @@ export default function useStepHandler({
       getCurrentMessages,
       applySubagentUpdate,
       onSkillAuthoringComplete,
+      resolveToolCallId,
     ],
   );
 

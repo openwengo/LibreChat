@@ -47,6 +47,7 @@ import {
 import useEventHandlers, { buildCreatedInitialResponse } from './useEventHandlers';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useUsageHandler from './useUsageHandler';
+import { activeElicitationsState, elicitationDataState } from '~/store/elicitation';
 import store from '~/store';
 
 type ChatHelpers = Pick<
@@ -515,6 +516,8 @@ export default function useResumableSSE(
   const setAbortScroll = useSetRecoilState(store.abortScrollFamily(runIndex));
   const setSubmission = useSetRecoilState(store.submissionByIndex(runIndex));
   const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(runIndex));
+  const setActiveElicitations = useSetRecoilState(activeElicitationsState);
+  const setElicitationData = useSetRecoilState(elicitationDataState);
 
   const sseRef = useRef<SSE | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -754,6 +757,26 @@ export default function useResumableSSE(
           if (data.event === ApprovalEvents.ON_PENDING_ACTION) {
             applyPendingActionToMessages(data.data as Agents.PendingAction);
             setIsSubmitting(true);
+            return;
+          }
+
+          if (data.type === 'elicitation_created' && data.elicitationData) {
+            const elicitationData = data.elicitationData;
+            setElicitationData((prev) => ({
+              ...prev,
+              [elicitationData.id]: elicitationData,
+            }));
+            if (elicitationData.tool_call_id) {
+              setActiveElicitations((prev) => {
+                const newState = {
+                  ...prev,
+                  [elicitationData.tool_call_id]: {
+                    ...elicitationData,
+                  },
+                };
+                return newState;
+              });
+            }
             return;
           }
 

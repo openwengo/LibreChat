@@ -705,13 +705,14 @@ async function createMCPTool({
       evictStale(missingToolCache, MISSING_TOOL_TTL_MS);
     }
   }
-
   if (!toolDefinition) {
     logger.warn(
       `[MCP][${serverName}][${toolName}] Tool definition not found, returning unavailable stub.`,
     );
     return createUnavailableToolStub(toolName, serverName);
   }
+
+  logger.debug(`createMCPTool(${toolKey})`);
 
   return createToolInstance({
     res,
@@ -817,6 +818,7 @@ function createToolInstance({
       const customUserVars =
         config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`];
 
+      const toolCallId = toolCall?.id || toolCall?.tool_call_id || toolCall?.tool_call_ids?.[0];
       const result = await mcpManager.callTool({
         serverName,
         serverConfig: capturedServerConfig,
@@ -825,6 +827,7 @@ function createToolInstance({
         toolArguments,
         options: {
           signal: derivedSignal,
+          tool_call_id: toolCallId,
         },
         user: effectiveUser,
         requestBody: config?.configurable?.requestBody ?? capturedRequestBody,

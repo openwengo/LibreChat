@@ -17,6 +17,7 @@ export * from './mcp';
 export * from './favorites';
 export * from './subagents';
 export * from './usage';
+export * from './elicitation';
 
 export default {
   ...artifacts,

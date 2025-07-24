@@ -978,4 +978,7 @@ router.delete(
   deleteMCPServerController,
 );
 
+// Mount elicitation routes
+router.use('/elicitations', elicitationRouter);
+
 module.exports = router;
