@@ -1,3 +1,4 @@
+import { activeElicitationsState, elicitationDataState } from '~/store';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
@@ -824,6 +825,8 @@ export default function useResumableSSE(
   const setSubmission = useSetRecoilState(store.submissionByIndex(runIndex));
   const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(runIndex));
   const setLiveAppliedSteerIds = useSetRecoilState(store.liveAppliedSteerIds);
+  const setActiveElicitations = useSetRecoilState(activeElicitationsState);
+  const setElicitationData = useSetRecoilState(elicitationDataState);
 
   const sseRef = useRef<SSE | null>(null);
   /** Removes the foreground re-attach listener owned by the newest
@@ -2168,6 +2171,26 @@ export default function useResumableSSE(
           }
 
           if (data.event === ReasoningLabelEvents.ON_REASONING_LABEL_ATTEMPT) {
+            return;
+          }
+
+          if (data.type === 'elicitation_created' && data.elicitationData) {
+            const elicitationData = data.elicitationData;
+            setElicitationData((prev) => ({
+              ...prev,
+              [elicitationData.id]: elicitationData,
+            }));
+            if (elicitationData.tool_call_id) {
+              setActiveElicitations((prev) => {
+                const newState = {
+                  ...prev,
+                  [elicitationData.tool_call_id]: {
+                    ...elicitationData,
+                  },
+                };
+                return newState;
+              });
+            }
             return;
           }
 
@@ -3789,6 +3812,8 @@ export default function useResumableSSE(
       clearDrainAfterAbort,
       resolveSteerChip,
       setLiveAppliedSteerIds,
+      setActiveElicitations,
+      setElicitationData,
       updateSteerChips,
       seedSteerChips,
       settleAppliedSteerParts,

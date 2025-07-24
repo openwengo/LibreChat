@@ -1310,4 +1310,7 @@ router.delete(
   (req, res) => deleteMCPServerController(req, res, maybeUninstallOAuthMCP),
 );
 
+// Mount elicitation routes
+router.use('/elicitations', elicitationRouter);
+
 module.exports = router;

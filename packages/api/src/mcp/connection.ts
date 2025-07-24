@@ -38,6 +38,7 @@ import { isAddressAllowed } from '~/auth/domain';
 import { withTimeout } from '~/utils/promise';
 import { isOAuthServer } from './utils';
 import { mcpConfig } from './mcpConfig';
+import { ElicitationCreateMethodSchema } from './zod';
 
 type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 type ManagedDispatcher = Agent | ProxyAgent;
@@ -1028,6 +1029,7 @@ export class MCPConnection extends EventEmitter {
   /** Set once per transport, so only the first of a conflict's repeat reports escalates. */
   private reportedStandaloneSseConflict = false;
   private agents: Dispatcher[] = [];
+  private currentToolCallId?: string; // Current active tool_call_id for this connection
   private readonly userId?: string;
   private lastPingTime: number;
   private lastConnectionCheckAt: number = 0;
@@ -1214,7 +1216,9 @@ export class MCPConnection extends EventEmitter {
         version: '1.2.3',
       },
       {
-        capabilities: {},
+        capabilities: {
+          elicitation: {},
+        },
       },
     );
 
@@ -1830,6 +1834,25 @@ export class MCPConnection extends EventEmitter {
     this.client.setNotificationHandler(ResourceListChangedNotificationSchema, async () => {
       this.emit('resourcesChanged');
     });
+
+    // Handle elicitation/create requests from MCP servers
+    this.client.setRequestHandler(ElicitationCreateMethodSchema, async (request) => {
+      logger.info(`${this.getLogPrefix()} Received elicitation request:`, request);
+
+      // Use the current tool_call_id for this connection
+      const tool_call_id = this.currentToolCallId;
+
+      // Emit the elicitation request to be handled by the manager
+      return new Promise((resolve) => {
+        this.emit('elicitationRequest', {
+          serverName: this.serverName,
+          userId: this.userId,
+          request: request.params,
+          resolve,
+          context: { tool_call_id },
+        });
+      });
+    });
   }
 
   /**
@@ -2428,6 +2451,7 @@ export class MCPConnection extends EventEmitter {
         return;
       }
       this.connectionState = 'disconnected';
+      this.clearCurrentToolCallId(); // Clear current tool call on disconnect
       this.emit('connectionChange', 'disconnected');
     } finally {
       this.connectPromise = null;
@@ -2899,5 +2923,25 @@ export class MCPConnection extends EventEmitter {
     }
 
     return false;
+  }
+
+  /**
+   * Set the current tool call ID for this connection
+   */
+  setCurrentToolCallId(tool_call_id: string | undefined): void {
+    this.currentToolCallId = tool_call_id;
+    if (tool_call_id) {
+      logger.debug(`${this.getLogPrefix()} Set current tool_call_id: ${tool_call_id}`);
+    }
+  }
+
+  /**
+   * Clear the current tool call ID (called when tool call completes)
+   */
+  clearCurrentToolCallId(): void {
+    if (this.currentToolCallId) {
+      logger.debug(`${this.getLogPrefix()} Cleared tool_call_id: ${this.currentToolCallId}`);
+      this.currentToolCallId = undefined;
+    }
   }
 }

@@ -18,6 +18,8 @@ import { toolPanelSpacingClassName } from './disclosure';
 import { useToolCallIntent } from './Parts/intent';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
+import ElicitationForm from './ElicitationForm';
+import { useElicitation } from '~/hooks/Chat/useElicitation';
 import ProgressText from './ProgressText';
 import { TOOL_ROW_CLASSES } from './rows';
 import { ToolAuthWarning } from './auth';
@@ -53,6 +55,7 @@ export default function ToolCall({
   runStepDurationMs?: PartMetadata['runStepDurationMs'];
 }) {
   const localize = useLocalize();
+  const { activeElicitation, hasActiveElicitation, respondToElicitation } = useElicitation(toolCallId);
   const [oauthError, setOAuthError] = useState<string | null>(null);
   const autoExpand = useRecoilValue(store.autoExpandTools);
   const hasOutput = (output?.length ?? 0) > 0;
@@ -351,6 +354,20 @@ export default function ToolCall({
       )}
       {!hideAttachments && attachments && attachments.length > 0 && (
         <AttachmentGroup attachments={attachments} />
+      )}
+      {hasActiveElicitation && activeElicitation && (
+        <div className="mt-4 space-y-4">
+          <ElicitationForm
+            key={activeElicitation.id}
+            request={activeElicitation.request}
+            serverName={activeElicitation.serverName}
+            onAccept={(data) =>
+              respondToElicitation(activeElicitation.id, { action: 'accept', content: data })
+            }
+            onDecline={() => respondToElicitation(activeElicitation.id, { action: 'decline' })}
+            onCancel={() => respondToElicitation(activeElicitation.id, { action: 'cancel' })}
+          />
+        </div>
       )}
     </>
   );
