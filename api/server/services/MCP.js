@@ -415,11 +415,12 @@ async function createMCPTool({
     });
     toolDefinition = result?.availableTools?.[toolKey]?.function;
   }
-
   if (!toolDefinition) {
     logger.warn(`[MCP][${serverName}][${toolName}] Tool definition not found, cannot create tool.`);
     return;
   }
+
+  logger.debug(`createMCPTool(${toolKey})`);
 
   return createToolInstance({
     res,
@@ -500,6 +501,7 @@ function createToolInstance({
       const customUserVars =
         config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`];
 
+      const toolCallId = toolCall?.id || toolCall?.tool_call_id || toolCall?.tool_call_ids?.[0];
       const result = await mcpManager.callTool({
         serverName,
         toolName,
@@ -507,6 +509,7 @@ function createToolInstance({
         toolArguments,
         options: {
           signal: derivedSignal,
+          tool_call_id: toolCallId,
         },
         user: config?.configurable?.user,
         requestBody: config?.configurable?.requestBody,
