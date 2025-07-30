@@ -1,6 +1,6 @@
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
-const { ContentTypes } = require('librechat-data-provider');
+const { ContentTypes, SystemRoles } = require('librechat-data-provider');
 const {
   saveConvo,
   saveMessage,
@@ -40,14 +40,19 @@ router.get('/', async (req, res) => {
     const sortOrder = sortDirection === 'asc' ? 1 : -1;
 
     if (conversationId && messageId) {
-      const message = await Message.findOne({
-        conversationId,
-        messageId,
-        user: user,
-      }).lean();
+      const filter = { conversationId, messageId };
+      // Only add user filter if not admin
+      if (req.user.role !== SystemRoles.ADMIN) {
+        filter.user = user;
+      }
+      const message = await Message.findOne(filter).lean();
       response = { messages: message ? [message] : [], nextCursor: null };
     } else if (conversationId) {
-      const filter = { conversationId, user: user };
+      const filter = { conversationId };
+      // Only add user filter if not admin
+      if (req.user.role !== SystemRoles.ADMIN) {
+        filter.user = user;
+      }
       if (cursor) {
         filter[sortField] = sortOrder === 1 ? { $gt: cursor } : { $lt: cursor };
       }
@@ -73,7 +78,12 @@ router.get('/', async (req, res) => {
         if (result.convoMap[message.conversationId]) {
           const convo = result.convoMap[message.conversationId];
 
-          const dbMessage = await getMessage({ user, messageId: message.messageId });
+          const messageFilter = { messageId: message.messageId };
+          // Only add user filter if not admin
+          if (req.user.role !== SystemRoles.ADMIN) {
+            messageFilter.user = user;
+          }
+          const dbMessage = await getMessage(messageFilter);
           activeMessages.push({
             ...message,
             title: convo.title,
@@ -107,7 +117,12 @@ router.post('/artifact/:messageId', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request parameters' });
     }
 
-    const message = await getMessage({ user: req.user.id, messageId });
+    const messageFilter = { messageId };
+    // Only add user filter if not admin
+    if (req.user.role !== SystemRoles.ADMIN) {
+      messageFilter.user = req.user.id;
+    }
+    const message = await getMessage(messageFilter);
     if (!message) {
       return res.status(404).json({ error: 'Message not found' });
     }

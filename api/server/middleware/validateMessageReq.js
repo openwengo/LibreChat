@@ -12,13 +12,15 @@ const validateMessageReq = async (req, res, next) => {
     conversationId = req.body.message.conversationId;
   }
 
-  const conversation = await getConvo(req.user.id, conversationId);
+  const conversation = await getConvo(req.user, conversationId);
 
   if (!conversation) {
     return res.status(404).json({ error: 'Conversation not found' });
   }
 
-  if (conversation.user !== req.user.id) {
+  // Only check ownership if user is not an admin
+  const { SystemRoles } = require('librechat-data-provider');
+  if (req.user.role !== SystemRoles.ADMIN && conversation.user !== req.user.id) {
     return res.status(403).json({ error: 'User not authorized for this conversation' });
   }
 

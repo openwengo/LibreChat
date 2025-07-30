@@ -1,4 +1,5 @@
 const { logger } = require('@librechat/data-schemas');
+const { SystemRoles } = require('librechat-data-provider');
 const { createTempChatExpirationDate } = require('@librechat/api');
 const getCustomConfig = require('~/server/services/Config/getCustomConfig');
 const { getMessages, deleteMessages } = require('./Message');
@@ -20,13 +21,24 @@ const searchConversation = async (conversationId) => {
 
 /**
  * Retrieves a single conversation for a given user and conversation ID.
- * @param {string} user - The user's ID.
+ * @param {string|Object} user - The user's ID or user object with role.
  * @param {string} conversationId - The conversation's ID.
  * @returns {Promise<TConversation>} The conversation object.
  */
 const getConvo = async (user, conversationId) => {
   try {
-    return await Conversation.findOne({ user, conversationId }).lean();
+    const filter = { conversationId };
+
+    // If user is an object with role property, check if they're an admin
+    if (typeof user === 'object' && user.role !== SystemRoles.ADMIN) {
+      filter.user = user.id;
+    } else if (typeof user === 'string') {
+      // Backward compatibility: if user is just a string (user ID)
+      filter.user = user;
+    }
+    // If user is an admin object, don't add user filter (can access any conversation)
+
+    return await Conversation.findOne(filter).lean();
   } catch (error) {
     logger.error('[getConvo] Error getting single conversation', error);
     return { message: 'Error getting single conversation' };

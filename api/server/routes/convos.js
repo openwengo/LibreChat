@@ -51,7 +51,7 @@ router.get('/', async (req, res) => {
 
 router.get('/:conversationId', async (req, res) => {
   const { conversationId } = req.params;
-  const convo = await getConvo(req.user.id, conversationId);
+  const convo = await getConvo(req.user, conversationId);
 
   if (convo) {
     res.status(200).json(convo);

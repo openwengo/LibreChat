@@ -13,7 +13,7 @@ async function abortRun(req, res) {
   res.setHeader('Content-Type', 'application/json');
   const { abortKey, endpoint } = req.body;
   const [conversationId, latestMessageId] = abortKey.split(':');
-  const conversation = await getConvo(req.user.id, conversationId);
+  const conversation = await getConvo(req.user, conversationId);
 
   if (conversation?.model) {
     req.body.model = conversation.model;

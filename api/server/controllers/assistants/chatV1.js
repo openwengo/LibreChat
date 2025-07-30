@@ -222,7 +222,7 @@ const chatV1 = async (req, res) => {
 
       finalEvent = {
         final: true,
-        conversation: await getConvo(req.user.id, conversationId),
+        conversation: await getConvo(req.user, conversationId),
         runMessages,
       };
     } catch (error) {
@@ -321,7 +321,7 @@ const chatV1 = async (req, res) => {
     const getRequestFileIds = async () => {
       let thread_file_ids = [];
       if (convoId) {
-        const convo = await getConvo(req.user.id, convoId);
+        const convo = await getConvo(req.user, convoId);
         if (convo && convo.file_ids) {
           thread_file_ids = convo.file_ids;
         }
