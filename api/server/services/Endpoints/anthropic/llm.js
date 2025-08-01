@@ -62,8 +62,13 @@ function getLLMConfig(apiKey, options = {}) {
   const supportsCacheControl =
     systemOptions.promptCache === true && checkPromptCacheSupport(requestOptions.model);
   const headers = getClaudeHeaders(requestOptions.model, supportsCacheControl);
-  if (headers) {
-    requestOptions.clientOptions.defaultHeaders = headers;
+
+  // Handle defaultHeaders from mergedOptions and merge with any additional headers
+  if (mergedOptions.defaultHeaders || headers) {
+    requestOptions.clientOptions.defaultHeaders = {
+      ...(options.defaultHeaders || {}),
+      ...(headers || {}),
+    };
   }
 
   if (options.proxy) {

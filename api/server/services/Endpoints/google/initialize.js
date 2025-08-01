@@ -5,7 +5,14 @@ const { getUserKey, checkUserKeyExpiry } = require('~/server/services/UserServic
 const { processExtraHeaders } = require('~/server/utils/headerUtil');
 const { GoogleClient } = require('~/app');
 
-const initializeClient = async ({ req, res, endpointOption, overrideModel, optionsOnly }) => {
+const initializeClient = async ({
+  req,
+  res,
+  endpointOption,
+  overrideModel,
+  optionsOnly,
+  extraHeaders,
+}) => {
   const { GOOGLE_KEY, GOOGLE_REVERSE_PROXY, GOOGLE_AUTH_HEADER, PROXY, GOOGLE_EXTRA_HEADERS } =
     process.env;
   const isUserProvided = GOOGLE_KEY === 'user_provided';
@@ -62,9 +69,21 @@ const initializeClient = async ({ req, res, endpointOption, overrideModel, optio
     clientOptions.streamRate = allConfig.streamRate;
   }
 
+  // Handle extra headers from environment variable or passed parameter
+  let combinedExtraHeaders = {};
   if (GOOGLE_EXTRA_HEADERS) {
     const headersList = GOOGLE_EXTRA_HEADERS.split(',').map((h) => h.trim());
-    clientOptions.customHeaders = processExtraHeaders(headersList, req.user);
+    combinedExtraHeaders = {
+      ...combinedExtraHeaders,
+      ...processExtraHeaders(headersList, req.user),
+    };
+  }
+  if (extraHeaders) {
+    combinedExtraHeaders = { ...combinedExtraHeaders, ...extraHeaders };
+  }
+
+  if (Object.keys(combinedExtraHeaders).length > 0) {
+    clientOptions.customHeaders = combinedExtraHeaders;
   }
 
   clientOptions = {
@@ -87,7 +106,15 @@ const initializeClient = async ({ req, res, endpointOption, overrideModel, optio
     if (overrideModel) {
       clientOptions.modelOptions.model = overrideModel;
     }
-    return getGoogleConfig(credentials, clientOptions);
+
+    const googleConfig = getGoogleConfig(credentials, clientOptions);
+
+    googleConfig.llmConfig.customHeaders = {
+      ...googleConfig.llmConfig.customHeaders,
+      ...clientOptions.customHeaders,
+    };
+
+    return googleConfig;
   }
 
   const client = new GoogleClient(credentials, clientOptions);
