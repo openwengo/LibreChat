@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Button } from '~/components/ui';
+import { Button } from '@librechat/client';
 import { useLocalize } from '~/hooks';
 
 interface ElicitationPropertySchema {
