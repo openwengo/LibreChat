@@ -17,6 +17,12 @@ RUN uv --version
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
 
+RUN apk update \
+    && apk add --no-cache python3-tkinter tcl tk \
+    && rm -rf /var/lib/apt/lists/* \
+    && uv init \
+    && uv add httpx mcp[cli]
+
 USER node
 
 COPY --chown=node:node . .
