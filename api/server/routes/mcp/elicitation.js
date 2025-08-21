@@ -23,7 +23,7 @@ router.post('/:id/respond', requireJwtAuth, async (req, res) => {
     const mcpManager = getMCPManager();
 
     // Verify the elicitation belongs to the user
-    const elicitation = mcpManager.getElicitationState(elicitationId);
+    const elicitation = mcpManager.elicitationManager.getElicitationState(elicitationId);
     if (!elicitation) {
       return res.status(404).json({ error: 'Elicitation not found' });
     }
@@ -33,7 +33,7 @@ router.post('/:id/respond', requireJwtAuth, async (req, res) => {
     }
 
     // Respond to the elicitation
-    const success = mcpManager.respondToElicitation(elicitationId, { action, content });
+    const success = mcpManager.elicitationManager.respondToElicitation(elicitationId, { action, content });
 
     if (!success) {
       return res.status(400).json({ error: 'Failed to respond to elicitation' });

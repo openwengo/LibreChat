@@ -114,7 +114,7 @@ const AgentController = async (req, res, next, initializeClient, addTitle) => {
     const elicitationListener = (eventData) => {
       if (eventData.userId === userId) {
         // Get the full elicitation state from the manager
-        const elicitationState = mcpManager.getElicitationState(eventData.elicitationId);
+        const elicitationState = mcpManager.elicitationManager.getElicitationState(eventData.elicitationId);
         if (elicitationState) {
           sendEvent(res, {
             type: 'elicitation_created',
@@ -124,9 +124,9 @@ const AgentController = async (req, res, next, initializeClient, addTitle) => {
         }
       }
     };
-    mcpManager.on('elicitationCreated', elicitationListener);
+    mcpManager.elicitationManager.on('elicitationCreated', elicitationListener);
     cleanupHandlers.push(() => {
-      mcpManager.removeListener('elicitationCreated', elicitationListener);
+      mcpManager.elicitationManager.removeListener('elicitationCreated', elicitationListener);
     });
 
     // Register client with finalization registry if available
