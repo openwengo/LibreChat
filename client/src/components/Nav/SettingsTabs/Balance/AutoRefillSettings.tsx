@@ -1,7 +1,6 @@
 import React from 'react';
+import { Label, InfoHoverCard, ESide } from '@librechat/client';
 import { TranslationKeys, useLocalize } from '~/hooks';
-import { Label } from '~/components';
-import HoverCardSettings from '~/components/Nav/SettingsTabs/HoverCardSettings';
 
 interface AutoRefillSettingsProps {
   lastRefill: Date;
@@ -114,7 +113,7 @@ const AutoRefillSettings: React.FC<AutoRefillSettingsProps> = ({
         {/* Left Section: Label */}
         <div className="flex items-center space-x-2">
           <Label className="font-light">{localize('com_nav_balance_next_refill')}</Label>
-          <HoverCardSettings side="bottom" text="com_nav_balance_next_refill_info" />
+          <InfoHoverCard side={ESide.Bottom} text={localize('com_nav_balance_next_refill_info')} />
         </div>
 
         {/* Right Section: tokenCredits Value */}

@@ -32,7 +32,7 @@ export class ElicitationManager extends EventEmitter {
         return activeElicitations;
     }
 
-    public async requestElicitation(connection: MCPConnection) {
+    public async requestElicitation(connection: MCPConnection, userId?: string): Promise<void> {
         connection.on(
             'elicitationRequest',
             async (data: {
@@ -45,7 +45,7 @@ export class ElicitationManager extends EventEmitter {
                 logger.info(`[MCP][${data.serverName}] Elicitation request received`);
 
                 // For app-level connections, we can't handle elicitation since there's no specific user
-                if (!data.userId) {
+                if (!userId) {
                     logger.warn(`[MCP][${data.serverName}] Cannot handle elicitation for app-level connection`);
                     data.resolve({ action: 'decline' });
                     return;
@@ -55,7 +55,7 @@ export class ElicitationManager extends EventEmitter {
                 const elicitationState: t.ElicitationState = {
                     id: elicitationId,
                     serverName: data.serverName,
-                    userId: data.userId,
+                    userId: userId,
                     request: data.request,
                     tool_call_id: data.context?.tool_call_id ?? data.request?.tool_call_id,
                     timestamp: Date.now(),
@@ -65,7 +65,7 @@ export class ElicitationManager extends EventEmitter {
                 this.elicitationResolvers.set(elicitationId, data.resolve);
 
                 this.emit('elicitationCreated', {
-                    userId: data.userId,
+                    userId: userId,
                     elicitationId,
                     tool_call_id: elicitationState.tool_call_id,
                 });
