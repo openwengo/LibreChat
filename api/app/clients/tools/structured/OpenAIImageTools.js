@@ -9,6 +9,7 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const { ContentTypes, EImageOutputType } = require('librechat-data-provider');
 const { logAxiosError, oaiToolkit, extractBaseURL } = require('@librechat/api');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 const { getFiles } = require('~/models');
 
 const displayMessage =
@@ -100,6 +101,15 @@ function createOpenAIImageTools(fields = {}) {
       'Content-Type': 'application/json',
     };
     closureConfig.apiKey = process.env.IMAGE_GEN_OAI_API_KEY;
+  }
+
+  if (process.env.IMAGE_GEN_OAI_EXTRA_HEADERS && req?.user) {
+    const headersList = process.env.IMAGE_GEN_OAI_EXTRA_HEADERS.split(',').map((h) => h.trim());
+    const extraHeaders = processExtraHeaders(headersList, req.user);
+    closureConfig.defaultHeaders = {
+      ...(closureConfig.defaultHeaders || {}),
+      ...extraHeaders,
+    };
   }
 
   const imageFiles = fields.imageFiles ?? [];
@@ -321,6 +331,7 @@ Error Message: ${error.message}`);
       /** @type {import('axios').RawAxiosHeaders} */
       let headers = {
         ...formData.getHeaders(),
+        ...(clientConfig.defaultHeaders || {}),
       };
 
       if (process.env.IMAGE_GEN_OAI_AZURE_API_VERSION && process.env.IMAGE_GEN_OAI_BASEURL) {

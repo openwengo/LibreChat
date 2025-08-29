@@ -241,6 +241,13 @@ export function getGoogleConfig(
     };
   }
 
+  if (provider === Providers.GOOGLE && options.headers && Object.keys(options.headers).length) {
+    (llmConfig as GoogleClientOptions).customHeaders = {
+      ...((llmConfig as GoogleClientOptions).customHeaders ?? {}),
+      ...options.headers,
+    };
+  }
+
   /** Handle defaultParams first - only process Google-native params if undefined */
   if (options.defaultParams && typeof options.defaultParams === 'object') {
     for (const [key, value] of Object.entries(options.defaultParams)) {

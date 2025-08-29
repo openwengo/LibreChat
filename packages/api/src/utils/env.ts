@@ -127,6 +127,25 @@ function processUserPlaceholders(
     return value;
   }
 
+  /**
+   * Backwards-compatible placeholders used by some EXTRA_HEADERS env vars:
+   * - {user_id}
+   * - {user_email}
+   */
+  if (value.includes('{user_email}')) {
+    let emailValue = '{user_email}';
+    if ('email' in user) {
+      emailValue = user.email == null ? '' : String(user.email);
+    }
+    value = value.replace(/\{user_email\}/g, emailValue);
+  }
+  if (value.includes('{user_id}')) {
+    const userId = 'id' in user ? user.id : undefined;
+    if (userId != null && userId !== '') {
+      value = value.replace(/\{user_id\}/g, String(userId));
+    }
+  }
+
   for (const field of ALLOWED_USER_FIELDS) {
     const placeholder = `{{LIBRECHAT_USER_${field.toUpperCase()}}}`;
 

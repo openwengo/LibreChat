@@ -63,6 +63,9 @@ export function getOpenAIConfig(
       addParams,
       dropParams,
       defaultParams,
+      // Ensure any caller-provided headers (e.g., EXTRA_HEADERS on Anthropic-like custom endpoints)
+      // are preserved and merged inside the Anthropic LLM config
+      defaultHeaders: headers,
     });
     /** Transform handles addParams/dropParams - it knows about OpenAI params */
     const transformed = transformToOpenAIConfig({

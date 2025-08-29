@@ -5,7 +5,13 @@ import type {
   OpenAIConfigOptions,
   UserKeyValues,
 } from '~/types';
-import { getAzureCredentials, resolveHeaders, isUserProvided, checkUserKeyExpiry } from '~/utils';
+import {
+  getAzureCredentials,
+  resolveHeaders,
+  isUserProvided,
+  checkUserKeyExpiry,
+  parseExtraHeaders,
+} from '~/utils';
 import { getOpenAIConfig } from './config';
 
 /**
@@ -64,6 +70,34 @@ export async function initializeOpenAI({
   const isAzureOpenAI = endpoint === EModelEndpoint.azureOpenAI;
   const azureConfig = isAzureOpenAI && appConfig?.endpoints?.[EModelEndpoint.azureOpenAI];
   let isServerless = false;
+
+  /**
+   * Allow extra headers on built-in OpenAI endpoint config (and `endpoints.all`).
+   * These are later resolved at request time in `createRun` (placeholders, env vars, etc).
+   */
+  if (!isAzureOpenAI) {
+    const allHeaders = (
+      appConfig?.endpoints?.all as unknown as {
+        headers?: Record<string, string>;
+      }
+    )?.headers;
+    const openAIHeaders = (
+      appConfig?.endpoints?.[EModelEndpoint.openAI] as unknown as {
+        headers?: Record<string, string>;
+      }
+    )?.headers;
+
+    const mergedHeaders = {
+      ...(allHeaders ?? {}),
+      ...(openAIHeaders ?? {}),
+      ...(clientOptions.headers ?? {}),
+      ...parseExtraHeaders(process.env.OPENAI_EXTRA_HEADERS),
+    };
+
+    if (Object.keys(mergedHeaders).length) {
+      clientOptions.headers = mergedHeaders;
+    }
+  }
 
   if (isAzureOpenAI && azureConfig) {
     const { modelGroupMap, groupMap } = azureConfig;
