@@ -7,6 +7,7 @@ export * from './env';
 export * from './events';
 export * from './files';
 export * from './generators';
+export * from './headers';
 export * from './path';
 export * from './key';
 export * from './latex';
