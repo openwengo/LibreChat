@@ -36,6 +36,8 @@ function getLLMConfig(
     model: anthropicSettings.model.default,
     maxOutputTokens: anthropicSettings.maxOutputTokens.default,
     stream: true,
+    // Ensure TS knows this field may exist when merging
+    stop: undefined as string[] | undefined,
   };
 
   const mergedOptions = Object.assign(defaultOptions, options.modelOptions);
@@ -68,9 +70,17 @@ function getLLMConfig(
 
   const supportsCacheControl =
     systemOptions.promptCache === true && checkPromptCacheSupport(requestOptions.model ?? '');
-  const headers = getClaudeHeaders(requestOptions.model ?? '', supportsCacheControl);
-  if (headers && requestOptions.clientOptions) {
-    requestOptions.clientOptions.defaultHeaders = headers;
+  const cacheHeaders = getClaudeHeaders(requestOptions.model ?? '', supportsCacheControl);
+
+  if (requestOptions.clientOptions) {
+    const mergedHeaders: Record<string, string> = {
+      ...(options.defaultHeaders ?? {}),
+      ...(cacheHeaders ?? {}),
+    };
+
+    if (Object.keys(mergedHeaders).length) {
+      requestOptions.clientOptions.defaultHeaders = mergedHeaders;
+    }
   }
 
   if (options.proxy && requestOptions.clientOptions) {

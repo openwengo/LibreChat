@@ -54,6 +54,8 @@ export interface AnthropicConfigOptions {
   proxy?: string | null;
   /** URL for a reverse proxy, if used */
   reverseProxyUrl?: string | null;
+  /** Default headers to include on Anthropic requests (e.g., from ANTHROPIC_EXTRA_HEADERS) */
+  defaultHeaders?: Record<string, string>;
 }
 
 /**

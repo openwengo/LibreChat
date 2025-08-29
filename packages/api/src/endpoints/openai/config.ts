@@ -51,6 +51,9 @@ export function getOpenAIConfig(
     const anthropicResult = getAnthropicLLMConfig(apiKey, {
       modelOptions,
       proxy: options.proxy,
+      // Ensure any caller-provided headers (e.g., EXTRA_HEADERS on Anthropic-like custom endpoints)
+      // are preserved and merged inside the Anthropic LLM config
+      defaultHeaders: headers,
     });
     const transformed = transformToOpenAIConfig({
       addParams,
