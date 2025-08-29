@@ -6,7 +6,7 @@ import type {
   GoogleConfigOptions,
   GoogleCredentials,
 } from '~/types';
-import { isEnabled, loadServiceKey, checkUserKeyExpiry } from '~/utils';
+import { isEnabled, loadServiceKey, checkUserKeyExpiry, parseExtraHeaders } from '~/utils';
 import { getGoogleConfig } from './llm';
 
 /**
@@ -77,6 +77,21 @@ export async function initializeGoogle({
 
   if (allConfig) {
     clientOptions.streamRate = allConfig.streamRate;
+  }
+
+  /**
+   * Allow extra headers on built-in Google endpoint config (and `endpoints.all`).
+   * These are resolved at request time in `createRun` (placeholders, env vars, etc).
+   */
+  const allHeaders = (allConfig as unknown as { headers?: Record<string, string> })?.headers;
+  const googleHeaders = (googleConfig as unknown as { headers?: Record<string, string> })?.headers;
+  const mergedHeaders = {
+    ...(allHeaders ?? {}),
+    ...(googleHeaders ?? {}),
+    ...parseExtraHeaders(process.env.GOOGLE_EXTRA_HEADERS),
+  };
+  if (Object.keys(mergedHeaders).length) {
+    clientOptions.headers = mergedHeaders;
   }
 
   clientOptions = {
