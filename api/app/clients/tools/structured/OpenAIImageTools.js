@@ -11,6 +11,7 @@ const { ContentTypes, EImageOutputType } = require('librechat-data-provider');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const extractBaseURL = require('~/utils/extractBaseURL');
 const { getFiles } = require('~/models/File');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 
 const displayMessage =
   "The tool displayed an image. All generated images are already plainly visible, so don't repeat the descriptions in detail. Do not list download links as they are available in the UI already. The user may download the images by clicking on them, but do not mention anything about downloading to the user.";
@@ -99,6 +100,15 @@ function createOpenAIImageTools(fields = {}) {
       'Content-Type': 'application/json',
     };
     closureConfig.apiKey = process.env.IMAGE_GEN_OAI_API_KEY;
+  }
+
+  if (process.env.IMAGE_GEN_OAI_EXTRA_HEADERS && req?.user) {
+    const headersList = process.env.IMAGE_GEN_OAI_EXTRA_HEADERS.split(',').map((h) => h.trim());
+    const extraHeaders = processExtraHeaders(headersList, req.user);
+    closureConfig.defaultHeaders = {
+      ...(closureConfig.defaultHeaders || {}),
+      ...extraHeaders,
+    };
   }
 
   const imageFiles = fields.imageFiles ?? [];
@@ -320,6 +330,7 @@ Error Message: ${error.message}`);
       /** @type {import('axios').RawAxiosHeaders} */
       let headers = {
         ...formData.getHeaders(),
+        ...(clientConfig.defaultHeaders || {}),
       };
 
       if (process.env.IMAGE_GEN_OAI_AZURE_API_VERSION && process.env.IMAGE_GEN_OAI_BASEURL) {
