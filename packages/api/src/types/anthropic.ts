@@ -60,6 +60,8 @@ export interface AnthropicConfigOptions {
   addParams?: Record<string, unknown>;
   /** Parameters to drop/exclude from the configuration */
   dropParams?: string[];
+  /** Default headers to include on Anthropic requests (e.g., from ANTHROPIC_EXTRA_HEADERS) */
+  defaultHeaders?: Record<string, string>;
 }
 
 /**
