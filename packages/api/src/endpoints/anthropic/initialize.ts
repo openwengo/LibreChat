@@ -3,6 +3,7 @@ import type { BaseInitializeParams, InitializeResultBase, AnthropicConfigOptions
 import { checkUserKeyExpiry, isEnabled } from '~/utils';
 import { loadAnthropicVertexCredentials, getVertexCredentialOptions } from './vertex';
 import { getLLMConfig } from './llm';
+import { parseExtraHeaders } from '~/utils/headers';
 
 /**
  * Initializes Anthropic endpoint configuration.
@@ -79,6 +80,22 @@ export async function initializeAnthropic({
 
   const anthropicConfig = appConfig?.endpoints?.[EModelEndpoint.anthropic];
   const allConfig = appConfig?.endpoints?.all;
+
+  /**
+   * Allow extra headers on built-in Anthropic endpoint config (and `endpoints.all`).
+   * These are resolved at request time in `createRun` (placeholders, env vars, etc).
+   */
+  const allHeaders = (allConfig as unknown as { headers?: Record<string, string> })?.headers;
+  const anthropicHeaders = (anthropicConfig as unknown as { headers?: Record<string, string> })
+    ?.headers;
+  const mergedHeaders = {
+    ...(allHeaders ?? {}),
+    ...(anthropicHeaders ?? {}),
+    ...parseExtraHeaders(process.env.ANTHROPIC_EXTRA_HEADERS),
+  };
+  if (Object.keys(mergedHeaders).length) {
+    clientOptions.defaultHeaders = mergedHeaders;
+  }
 
   const result = getLLMConfig(credentials, clientOptions);
 

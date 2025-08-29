@@ -227,6 +227,7 @@ export async function createRun({
       : new Set<string>();
 
   const agentInputs: AgentInputs[] = [];
+  const safeUser = createSafeUser(user);
   const buildAgentContext = (agent: RunAgent) => {
     const provider =
       (providerEndpointMap[
@@ -263,9 +264,37 @@ export async function createRun({
     if (llmConfig?.configuration?.defaultHeaders != null) {
       llmConfig.configuration.defaultHeaders = resolveHeaders({
         headers: llmConfig.configuration.defaultHeaders as Record<string, string>,
-        user: createSafeUser(user),
+        user: safeUser,
         body: requestBody,
       });
+    }
+
+    /** Resolve provider-specific header configurations */
+    const clientOptions = (
+      llmConfig as t.RunLLMConfig & {
+        clientOptions?: { defaultHeaders?: Record<string, string> };
+      }
+    ).clientOptions;
+    if (clientOptions?.defaultHeaders != null) {
+      clientOptions.defaultHeaders = resolveHeaders({
+        headers: clientOptions.defaultHeaders,
+        user: safeUser,
+        body: requestBody,
+      });
+    }
+
+    const customHeaders = (
+      llmConfig as t.RunLLMConfig & {
+        customHeaders?: Record<string, string>;
+      }
+    ).customHeaders;
+    if (customHeaders != null) {
+      (llmConfig as t.RunLLMConfig & { customHeaders: Record<string, string> }).customHeaders =
+        resolveHeaders({
+          headers: customHeaders,
+          user: safeUser,
+          body: requestBody,
+        });
     }
 
     /** Resolves issues with new OpenAI usage field */

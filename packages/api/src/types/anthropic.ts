@@ -88,6 +88,8 @@ export interface AnthropicConfigOptions {
   vertexOptions?: VertexAIClientOptions;
   /** Full Vertex AI configuration including model mappings from YAML config */
   vertexConfig?: TVertexAISchema;
+  /** Default headers to include on Anthropic requests (e.g., from ANTHROPIC_EXTRA_HEADERS) */
+  defaultHeaders?: Record<string, string>;
 }
 
 /**

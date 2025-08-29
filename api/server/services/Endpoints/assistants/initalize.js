@@ -3,9 +3,16 @@ const { ProxyAgent } = require('undici');
 const { isUserProvided, checkUserKeyExpiry } = require('@librechat/api');
 const { ErrorTypes, EModelEndpoint } = require('librechat-data-provider');
 const { getUserKeyValues, getUserKeyExpiry } = require('~/models');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 
 const initializeClient = async ({ req, res, version }) => {
-  const { PROXY, OPENAI_ORGANIZATION, ASSISTANTS_API_KEY, ASSISTANTS_BASE_URL } = process.env;
+  const {
+    PROXY,
+    OPENAI_ORGANIZATION,
+    ASSISTANTS_API_KEY,
+    ASSISTANTS_BASE_URL,
+    ASSISTANTS_EXTRA_HEADERS,
+  } = process.env;
 
   const userProvidesKey = isUserProvided(ASSISTANTS_API_KEY);
   const userProvidesURL = isUserProvided(ASSISTANTS_BASE_URL);
@@ -29,6 +36,13 @@ const initializeClient = async ({ req, res, version }) => {
     },
   };
 
+  if (ASSISTANTS_EXTRA_HEADERS && req?.user) {
+    const headersList = ASSISTANTS_EXTRA_HEADERS.split(',').map((h) => h.trim());
+    opts.defaultHeaders = {
+      ...opts.defaultHeaders,
+      ...processExtraHeaders(headersList, req.user),
+    };
+  }
   if (userProvidesKey & !apiKey) {
     throw new Error(
       JSON.stringify({
