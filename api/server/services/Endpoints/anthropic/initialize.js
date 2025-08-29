@@ -2,10 +2,12 @@ const { EModelEndpoint } = require('librechat-data-provider');
 const { getUserKey, checkUserKeyExpiry } = require('~/server/services/UserService');
 const { getLLMConfig } = require('~/server/services/Endpoints/anthropic/llm');
 const AnthropicClient = require('~/app/clients/AnthropicClient');
+const { processExtraHeaders } = require('~/server/utils/headerUtil');
 
 const initializeClient = async ({ req, res, endpointOption, overrideModel, optionsOnly }) => {
   const appConfig = req.config;
-  const { ANTHROPIC_API_KEY, ANTHROPIC_REVERSE_PROXY, PROXY } = process.env;
+  const { ANTHROPIC_API_KEY, ANTHROPIC_REVERSE_PROXY, PROXY, ANTHROPIC_EXTRA_HEADERS } =
+    process.env;
   const expiresAt = req.body.key;
   const isUserProvided = ANTHROPIC_API_KEY === 'user_provided';
 
@@ -34,6 +36,11 @@ const initializeClient = async ({ req, res, endpointOption, overrideModel, optio
   const allConfig = appConfig.endpoints?.all;
   if (allConfig) {
     clientOptions.streamRate = allConfig.streamRate;
+  }
+
+  if (ANTHROPIC_EXTRA_HEADERS) {
+    const headersList = ANTHROPIC_EXTRA_HEADERS.split(',').map((h) => h.trim());
+    clientOptions.defaultHeaders = processExtraHeaders(headersList, req.user);
   }
 
   if (optionsOnly) {
