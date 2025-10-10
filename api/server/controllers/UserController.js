@@ -1,3 +1,4 @@
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
 const {
@@ -521,6 +522,7 @@ const deleteUserController = async (req, res) => {
     await db.deleteUserSkills(user.id);
     await deleteUserMcpServers(user.id);
     await db.deleteActions({ user: user.id });
+    await getTokenStoreMethods().deleteTokens({ userId: user.id });
     await db.deleteTokens({ userId: user.id });
     await db.removeUserFromAllGroups(user.id);
     await db.deleteAclEntries({ principalId: user._id });

@@ -33,6 +33,12 @@ import type { Agent } from './types/agents';
 
 export * from './schemas';
 export * from './types/subagents';
+export type {
+  TTokenStoreConfig,
+  TokenStoreBackend,
+  TAwsTokenStoreConfig,
+  TAuthConfig,
+} from './tokenStore';
 
 export type TMessages = TMessage[];
 

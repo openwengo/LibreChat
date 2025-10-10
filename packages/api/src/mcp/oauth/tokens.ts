@@ -12,6 +12,7 @@ import type { OAuthTokens, OAuthClientInformation } from '@modelcontextprotocol/
 import type { MCPOAuthTokens, ExtendedOAuthTokens, OAuthStoredClientMetadata } from './types';
 import type { FlowLease, FlowStateManager } from '~/flow/manager';
 import { isInvalidClientMessage } from '~/mcp/utils';
+import { extractEncryptedFlag } from './storage/awsUtils';
 import { isSystemUserId } from '~/mcp/enum';
 
 export class ReauthenticationRequiredError extends Error {
@@ -230,6 +231,20 @@ interface MCPRefreshFlight {
 }
 
 export class MCPTokenStorage {
+  private static encryptTokens = true;
+
+  static setEncryptionPreference(shouldEncrypt: boolean): void {
+    this.encryptTokens = shouldEncrypt;
+  }
+
+  private static async encodeToken(token: string): Promise<string> {
+    return this.encryptTokens ? encryptV2(token) : token;
+  }
+
+  private static async decodeToken(token: IToken): Promise<string> {
+    return extractEncryptedFlag(token.metadata) ? decryptV2(token.token) : token.token;
+  }
+
   /**
    * Process-local in-flight refresh-token redemptions, keyed by
    * `tenantId:userId:serverName:bindingScope`. Every code path that redeems a refresh token
@@ -414,7 +429,7 @@ export class MCPTokenStorage {
       }
 
       const clientInfo = JSON.parse(
-        await decryptV2(clientInfoData.token),
+        await this.decodeToken(clientInfoData),
       ) as OAuthClientInformation;
       try {
         validateClientBinding(clientInfo, getTokenMetadata(clientInfoData));
@@ -466,7 +481,7 @@ export class MCPTokenStorage {
       return (
         credentialSetId != null &&
         getCredentialSetId(tokenData) === credentialSetId &&
-        (await decryptV2(tokenData.token)) === accessToken
+        (await this.decodeToken(tokenData)) === accessToken
       );
     } catch (error) {
       logger.warn(`${this.getLogPrefix(userId, serverName)} Failed to verify cached access token`, {
@@ -569,7 +584,7 @@ export class MCPTokenStorage {
          */
         credentialSetId = validTokenCredentialSetId ?? randomUUID();
       }
-      const tokenMetadata = { credential_set_id: credentialSetId };
+      const tokenMetadata = { credential_set_id: credentialSetId, encrypted: this.encryptTokens };
 
       /**
        * Snapshot every record before the first write. Conditional updates below use these
@@ -716,7 +731,7 @@ export class MCPTokenStorage {
       const plannedWrites: PlannedTokenWrite[] = [];
 
       // Encrypt and store access token
-      const encryptedAccessToken = await encryptV2(tokens.access_token);
+      const encryptedAccessToken = await this.encodeToken(tokens.access_token);
 
       logger.debug(
         `${logPrefix} Token expires_in: ${'expires_in' in tokens ? tokens.expires_in : 'N/A'}, expires_at: ${'expires_at' in tokens ? tokens.expires_at : 'N/A'}`,
@@ -799,7 +814,7 @@ export class MCPTokenStorage {
         logger.debug(
           `${logPrefix} New refresh token received from OAuth server, will store/update`,
         );
-        const encryptedRefreshToken = await encryptV2(tokens.refresh_token);
+        const encryptedRefreshToken = await this.encodeToken(tokens.refresh_token);
         const extendedTokens = tokens as ExtendedOAuthTokens;
         const refreshTokenExpiry = extendedTokens.refresh_token_expires_in
           ? new Date(Date.now() + extendedTokens.refresh_token_expires_in * 1000)
@@ -846,7 +861,7 @@ export class MCPTokenStorage {
           client_id: clientInfo.client_id,
           has_client_secret: !!clientInfo.client_secret,
         });
-        const encryptedClientInfo = await encryptV2(JSON.stringify(clientInfo));
+        const encryptedClientInfo = await this.encodeToken(JSON.stringify(clientInfo));
 
         const clientInfoData = {
           userId,
@@ -854,7 +869,7 @@ export class MCPTokenStorage {
           identifier: `${identifier}:client`,
           token: encryptedClientInfo,
           expiresIn: 365 * 24 * 60 * 60,
-          metadata: { ...metadata, credential_set_id: credentialSetId },
+          metadata: { ...metadata, credential_set_id: credentialSetId, encrypted: this.encryptTokens },
         };
 
         plannedWrites.push({
@@ -1581,7 +1596,7 @@ export class MCPTokenStorage {
           identifier: `${identifier}:client`,
         });
         if (clientInfoData) {
-          const decryptedClientInfo = await decryptV2(clientInfoData.token);
+          const decryptedClientInfo = await this.decodeToken(clientInfoData);
           clientInfo = JSON.parse(decryptedClientInfo);
           logger.debug(`${logPrefix} Retrieved client info:`, {
             client_id: clientInfo.client_id,
@@ -1631,7 +1646,7 @@ export class MCPTokenStorage {
           new Error('OAuth credential changed before redemption'),
         );
       }
-      const decryptedRefreshToken = await decryptV2(refreshTokenData.token);
+      const decryptedRefreshToken = await this.decodeToken(refreshTokenData);
 
       const metadata = {
         userId,
@@ -1943,7 +1958,7 @@ export class MCPTokenStorage {
       throw new ReauthenticationRequiredError(serverName, 'binding');
     }
 
-    const decryptedAccessToken = await decryptV2(accessTokenData.token);
+    const decryptedAccessToken = await this.decodeToken(accessTokenData);
 
     /** Get refresh token if available */
     const refreshTokenData = await findToken({
@@ -1968,7 +1983,7 @@ export class MCPTokenStorage {
     };
 
     if (refreshTokenData && getCredentialSetId(refreshTokenData) === credentialSetId) {
-      tokens.refresh_token = await decryptV2(refreshTokenData.token);
+      tokens.refresh_token = await this.decodeToken(refreshTokenData);
     } else if (refreshTokenData) {
       logger.warn(`${logPrefix} Ignoring refresh token from a different OAuth credential set`);
     }
@@ -1999,7 +2014,7 @@ export class MCPTokenStorage {
       return null;
     }
 
-    const tokenData = await decryptV2(clientInfoData.token);
+    const tokenData = await this.decodeToken(clientInfoData);
     const clientInfo = JSON.parse(tokenData);
 
     const clientMetadata = getTokenMetadata(clientInfoData);

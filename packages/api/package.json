@@ -179,6 +179,8 @@
   "dependencies": {
     "@langchain/langgraph-checkpoint": "^1.1.2",
     "@langchain/langgraph-checkpoint-mongodb": "^1.4.0",
+    "@aws-sdk/client-ssm": "^3.848.0",
+    "@aws-sdk/client-secrets-manager": "^3.848.0",
     "cluster-key-slot": "^1.1.2",
     "croner": "^10.0.1",
     "express-rate-limit": "^8.5.1",

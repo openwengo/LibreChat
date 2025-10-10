@@ -1,3 +1,4 @@
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { logger } = require('@librechat/data-schemas');
 const {
   formatMCPServerTools,
@@ -13,10 +14,6 @@ const {
 const { CacheKeys, Constants } = require('librechat-data-provider');
 const { getMCPManager, getMCPServersRegistry, getFlowStateManager } = require('~/config');
 const {
-  findToken,
-  createToken,
-  updateToken,
-  deleteTokens,
   findPluginAuthsByKeys,
 } = require('~/models');
 const { getGraphApiToken } = require('~/server/services/GraphTokenService');
@@ -61,7 +58,7 @@ async function loadMCPServerCatalogs({
   recoveryPolicy,
 }) {
   const flowManager = getFlowStateManager(getLogStores(CacheKeys.FLOWS));
-  const tokenMethods = { findToken, updateToken, createToken, deleteTokens };
+  const tokenMethods = getTokenStoreMethods();
   const mcpManager = getMCPManager();
   const onOAuthCredentialsChanging = (scope) =>
     prepareMCPAuthorizationMutation(scope, {
@@ -235,7 +232,7 @@ async function reinitMCPServer({
         retryDelaysMs: recoveryPolicy?.authorizationFenceRetryMs,
         attemptTimeoutMs: recoveryPolicy?.authorizationFenceTimeoutMs,
       });
-    const tokenMethods = { findToken, updateToken, createToken, deleteTokens };
+    const tokenMethods = getTokenStoreMethods();
 
     if (!ephemeralServer) {
       publicationGeneration = await getMCPToolsCacheGeneration({

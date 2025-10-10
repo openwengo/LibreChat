@@ -50,6 +50,7 @@ export {
   DEFAULT_RETAINED_ANSWER_TOKENS,
   DEFAULT_MAX_RETAINED_TOOL_COUNT_CHARS,
 } from './limits';
+import { authConfigSchema } from './tokenStore';
 
 export const defaultSocialLogins = ['google', 'facebook', 'openid', 'github', 'discord', 'saml'];
 
@@ -2984,6 +2985,7 @@ export const permissionWriteAttemptsSchema = z.number().int().min(1).max(100).de
 export const configSchema = z.object({
   version: z.string(),
   permissions: z.object({ maxWriteAttempts: permissionWriteAttemptsSchema }).optional(),
+  auth: authConfigSchema.optional(),
   cache: z.boolean().default(true),
   ocr: ocrSchema.optional(),
   webSearch: webSearchSchema.optional(),

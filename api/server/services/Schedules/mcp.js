@@ -1,3 +1,4 @@
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { createScheduleMCPPreflight } = require('@librechat/api');
 const { CacheKeys } = require('librechat-data-provider');
 const { getMCPManager, getMCPServersRegistry, getFlowStateManager } = require('~/config');
@@ -35,12 +36,7 @@ function createMCPPreflight(options = {}) {
       getMCPManager().getConnection({
         ...connectionOptions,
         flowManager: getFlowStateManager(getLogStores(CacheKeys.FLOWS)),
-        tokenMethods: {
-          findToken: methods.findToken,
-          updateToken: methods.updateToken,
-          createToken: methods.createToken,
-          deleteTokens: methods.deleteTokens,
-        },
+        tokenMethods: getTokenStoreMethods(),
         graphTokenResolver: getGraphApiToken,
         oboTokenResolver: exchangeOboToken,
         oboTrustChecker: createOboTrustChecker(),

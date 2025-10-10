@@ -1,3 +1,4 @@
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { tool } = require('@librechat/agents/langchain/tools');
 const { logger, getTenantId } = require('@librechat/data-schemas');
 const { Providers, Constants: AgentConstants } = require('@librechat/agents');
@@ -63,7 +64,7 @@ const {
   getMCPManager,
 } = require('~/config');
 const db = require('~/models');
-const { findToken, createToken, updateToken, deleteTokens, findPluginAuthsByKeys } = db;
+const { findPluginAuthsByKeys } = db;
 const { getGraphApiToken } = require('./GraphTokenService');
 const { exchangeOboToken } = require('./OboTokenService');
 const { createOboTrustChecker } = require('./OboPolicyService');
@@ -1336,12 +1337,7 @@ function createToolInstance({
           config?.configurable?.requestScopedConnections ?? capturedRequestScopedConnections,
         customUserVars,
         flowManager,
-        tokenMethods: {
-          findToken,
-          createToken,
-          updateToken,
-          deleteTokens,
-        },
+        tokenMethods: getTokenStoreMethods(),
         onOAuthCredentialsChanging: (scope) =>
           prepareMCPAuthorizationMutation(scope, {
             invalidateRecoveryGeneration: invalidateCachedTools,
@@ -1612,7 +1608,7 @@ async function hasDurableMCPAuthorization(userId, serverName, config, runtimeCon
   return MCPTokenStorage.hasStoredAuthorization({
     userId,
     serverName,
-    findToken,
+    findToken: getTokenStoreMethods().findToken,
     validateClientBinding: (clientInfo, storedMetadata) =>
       MCPOAuthHandler.assertStoredClientBinding(
         serverName,
