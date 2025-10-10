@@ -1,3 +1,4 @@
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { Router } = require('express');
 const { logger, getTenantId, tenantStorage } = require('@librechat/data-schemas');
 const {
@@ -501,7 +502,7 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
           userId: flowState.userId,
           serverName,
           deleteToken: async (filter) => {
-            await db.deleteTokens({
+            await getTokenStoreMethods().deleteTokens({
               ...filter,
               metadataCredentialSetId: storedTokens.credential_set_id,
             });
@@ -536,10 +537,10 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
                     userId: flowState.userId,
                     serverName,
                     tokens: candidateTokens,
-                    createToken: db.createToken,
-                    updateToken: db.updateToken,
-                    deleteTokens: db.deleteTokens,
-                    findToken: db.findToken,
+                    createToken: getTokenStoreMethods().createToken,
+                    updateToken: getTokenStoreMethods().updateToken,
+                    deleteTokens: getTokenStoreMethods().deleteTokens,
+                    findToken: getTokenStoreMethods().findToken,
                     clientInfo: flowState.clientInfo,
                     metadata: MCPOAuthHandler.buildStoredClientMetadata(
                       flowState.metadata,
@@ -650,12 +651,7 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
                 flowManager,
                 serverConfig,
                 customUserVars,
-                tokenMethods: {
-                  findToken: db.findToken,
-                  updateToken: db.updateToken,
-                  createToken: db.createToken,
-                  deleteTokens: db.deleteTokens,
-                },
+                tokenMethods: getTokenStoreMethods(),
                 onOAuthCredentialsChanging: (scope) =>
                   prepareMCPAuthorizationMutation(scope, {
                     invalidateRecoveryGeneration: invalidateCachedTools,

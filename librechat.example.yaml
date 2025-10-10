@@ -54,6 +54,20 @@ cache: true
 #     userIdField: email
 #     userMetadataFields: [email, username, role, provider]
 #     conversationMetadataFields: [conversationId, endpoint, model, modelLabel, spec]
+# Token storage configuration (MCP OAuth tokens, etc.)
+auth:
+  tokenStore:
+    # Options: mongo | aws-parameter | aws-secrets
+    backend: mongo
+    # When using AWS backends, LibreChat can optionally encrypt tokens with encryptV2 before sending to AWS
+    encryptBeforeStore: true
+    # aws:
+    #   region: us-east-1
+    #   parameterPrefix: /librechat/{env}/mcp
+    #   secretPrefix: /librechat/{env}/mcp
+    #   retry:
+    #     maxAttempts: 3
+    #     backoffMs: 200
 
 # File storage configuration
 # Single strategy for all file types (legacy format, still supported)

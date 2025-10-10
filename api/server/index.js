@@ -83,6 +83,7 @@ const { configureSubagentTaskRouting } = require('./services/Endpoints/agents/su
 const configureSocialLogins = require('./socialLogins');
 const createSpaFallback = require('./utils/fallback');
 const { getAppConfig } = require('./services/Config');
+const { initializeTokenStore } = require('./services/TokenStore');
 const staticCache = require('./utils/staticCache');
 const noIndex = require('./middleware/noIndex');
 const routes = require('./routes');
@@ -232,6 +233,7 @@ const startServer = async () => {
   const appConfig = await getAppConfig({ baseOnly: true });
   configureAgentEventRuntime(appConfig?.endpoints?.agents?.eventDriven);
   warnOnUnreachableDeliveryPaths(appConfig);
+  initializeTokenStore(appConfig);
   initializeFileStorage(appConfig);
   const projectRoot = path.resolve(__dirname, '../..');
   // Plugin hooks execute only when the operator opts in via DEPLOYMENT_PLUGIN_HOOKS;

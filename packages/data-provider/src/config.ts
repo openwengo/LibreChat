@@ -36,6 +36,7 @@ export {
   MAX_CHAT_PROJECT_NAME_LENGTH,
   MAX_CHAT_PROJECT_DESCRIPTION_LENGTH,
 } from './limits';
+import { authConfigSchema } from './tokenStore';
 
 export const defaultSocialLogins = ['google', 'facebook', 'openid', 'github', 'discord', 'saml'];
 
@@ -2674,6 +2675,7 @@ export type LangfuseConfig = z.infer<typeof langfuseConfigSchema>;
 
 export const configSchema = z.object({
   version: z.string(),
+  auth: authConfigSchema.optional(),
   cache: z.boolean().default(true),
   ocr: ocrSchema.optional(),
   webSearch: webSearchSchema.optional(),

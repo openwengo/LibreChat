@@ -1,3 +1,4 @@
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { CacheKeys } = require('librechat-data-provider');
 const { MCPOAuthHandler, MCPTokenStorage, cleanupMCPServerOAuth } = require('@librechat/api');
 const { getFlowStateManager, getMCPServersRegistry } = require('~/config');
@@ -15,8 +16,8 @@ const maybeUninstallOAuthMCP = async (userId, pluginKey, appConfig, serverConfig
       flowManager: getFlowStateManager(getLogStores(CacheKeys.FLOWS)),
       oauthHandler: MCPOAuthHandler,
       tokenStorage: MCPTokenStorage,
-      findToken: db.findToken,
-      deleteTokens: db.deleteTokens,
+      findToken: getTokenStoreMethods().findToken,
+      deleteTokens: getTokenStoreMethods().deleteTokens,
       getServerConfig: (serverName, ownerId) => registry.getServerConfig(serverName, ownerId),
       isRegisteredOAuthServer: async (serverName, ownerId) =>
         (await registry.getOAuthServers(ownerId)).has(serverName),
