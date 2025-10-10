@@ -127,6 +127,20 @@ jest.mock('~/server/services/Config', () => ({
   getAppConfig: jest.fn().mockResolvedValue({ mcpConfig: {} }),
 }));
 
+jest.mock('~/server/services/TokenStore', () => {
+  const methods = {
+    findToken: jest.fn(),
+    updateToken: jest.fn(),
+    createToken: jest.fn(),
+    deleteTokens: jest.fn(),
+  };
+  return {
+    initializeTokenStore: jest.fn(),
+    getTokenStoreMethods: jest.fn(() => methods),
+    __mockedMethods: methods,
+  };
+});
+
 jest.mock('~/server/services/Config/mcp', () => ({
   updateMCPServerTools: jest.fn(),
 }));

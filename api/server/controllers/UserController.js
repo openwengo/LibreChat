@@ -24,6 +24,7 @@ const { verifyEmail, resendVerificationEmail } = require('~/server/services/Auth
 const { getMCPManager, getFlowStateManager, getMCPServersRegistry } = require('~/config');
 const { invalidateCachedTools } = require('~/server/services/Config/getCachedTools');
 const { processDeleteRequest } = require('~/server/services/Files/process');
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { getAppConfig } = require('~/server/services/Config');
 const { getLogStores } = require('~/cache');
 const db = require('~/models');
@@ -423,12 +424,13 @@ const resendVerificationController = async (req, res) => {
 
 /** Best-effort cleanup of stored MCP OAuth tokens and flow state. */
 const clearStoredMCPOAuthState = async (userId, serverName) => {
+  const tokenMethods = getTokenStoreMethods();
   try {
     await MCPTokenStorage.deleteUserTokens({
       userId,
       serverName,
       deleteToken: async (filter) => {
-        await db.deleteTokens(filter);
+        await tokenMethods.deleteTokens(filter);
       },
     });
   } catch (error) {
@@ -492,13 +494,15 @@ const maybeUninstallOAuthMCP = async (userId, pluginKey, appConfig) => {
     return;
   }
 
+  const tokenMethods = getTokenStoreMethods();
+
   // 1. get client info used for revocation (client id, secret)
   let clientTokenData = null;
   try {
     clientTokenData = await MCPTokenStorage.getClientInfoAndMetadata({
       userId,
       serverName,
-      findToken: db.findToken,
+      findToken: tokenMethods.findToken,
     });
   } catch (error) {
     logger.warn(
@@ -523,7 +527,7 @@ const maybeUninstallOAuthMCP = async (userId, pluginKey, appConfig) => {
     tokens = await MCPTokenStorage.getTokens({
       userId,
       serverName,
-      findToken: db.findToken,
+      findToken: tokenMethods.findToken,
     });
   } catch (error) {
     logger.warn(
@@ -594,7 +598,7 @@ const maybeUninstallOAuthMCP = async (userId, pluginKey, appConfig) => {
     }
   }
 
-  // 4. delete tokens from the DB and clear the flow state after revocation attempts
+  // 4. delete tokens from the configured store and clear the flow state after revocation attempts
   await clearStoredMCPOAuthState(userId, serverName);
 };
 

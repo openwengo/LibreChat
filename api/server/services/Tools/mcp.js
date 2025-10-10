@@ -6,10 +6,10 @@ const {
 } = require('@librechat/api');
 const { CacheKeys, Constants } = require('librechat-data-provider');
 const { getMCPManager, getMCPServersRegistry, getFlowStateManager } = require('~/config');
-const { findToken, createToken, updateToken, deleteTokens } = require('~/models');
 const { getGraphApiToken } = require('~/server/services/GraphTokenService');
 const { exchangeOboToken } = require('~/server/services/OboTokenService');
 const { createOboTrustChecker } = require('~/server/services/OboPolicyService');
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { updateMCPServerTools } = require('~/server/services/Config');
 const { getLogStores } = require('~/cache');
 
@@ -149,7 +149,7 @@ async function reinitMCPServer({
 
     const flowManager = _flowManager ?? getFlowStateManager(getLogStores(CacheKeys.FLOWS));
     const mcpManager = getMCPManager();
-    const tokenMethods = { findToken, updateToken, createToken, deleteTokens };
+    const tokenMethods = getTokenStoreMethods();
 
     const oauthStart =
       _oauthStart ??

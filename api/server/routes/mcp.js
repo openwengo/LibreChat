@@ -47,6 +47,7 @@ const { requireJwtAuth, canAccessMCPServerResource } = require('~/server/middlew
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { updateMCPServerTools } = require('~/server/services/Config/mcp');
 const { reinitMCPServer } = require('~/server/services/Tools/mcp');
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { getLogStores } = require('~/cache');
 const db = require('~/models');
 
@@ -387,13 +388,14 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
       /** Persist tokens immediately so reconnection uses fresh credentials */
       if (flowState?.userId && tokens) {
         try {
+          const tokenMethods = getTokenStoreMethods();
           await MCPTokenStorage.storeTokens({
             userId: flowState.userId,
             serverName,
             tokens,
-            createToken: db.createToken,
-            updateToken: db.updateToken,
-            findToken: db.findToken,
+            createToken: tokenMethods.createToken,
+            updateToken: tokenMethods.updateToken,
+            findToken: tokenMethods.findToken,
             clientInfo: flowState.clientInfo,
             metadata: MCPOAuthHandler.buildStoredClientMetadata(
               flowState.metadata,
@@ -464,12 +466,7 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
             serverName,
             flowManager,
             serverConfig,
-            tokenMethods: {
-              findToken: db.findToken,
-              updateToken: db.updateToken,
-              createToken: db.createToken,
-              deleteTokens: db.deleteTokens,
-            },
+            tokenMethods: getTokenStoreMethods(),
           });
 
           logger.info(

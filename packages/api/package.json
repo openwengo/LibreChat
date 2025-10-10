@@ -169,6 +169,8 @@
   },
   "dependencies": {
     "@langchain/langgraph-checkpoint": "^1.1.2",
-    "@langchain/langgraph-checkpoint-mongodb": "^1.4.0"
+    "@langchain/langgraph-checkpoint-mongodb": "^1.4.0",
+    "@aws-sdk/client-ssm": "^3.848.0",
+    "@aws-sdk/client-secrets-manager": "^3.848.0"
   }
 }

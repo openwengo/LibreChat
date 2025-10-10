@@ -37,10 +37,10 @@ const {
   getMCPManager,
 } = require('~/config');
 const db = require('~/models');
-const { findToken, createToken, updateToken, deleteTokens } = db;
 const { getGraphApiToken } = require('./GraphTokenService');
 const { exchangeOboToken } = require('./OboTokenService');
 const { createOboTrustChecker } = require('./OboPolicyService');
+const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { reinitMCPServer } = require('./Tools/mcp');
 const { getAppConfig } = require('./Config');
 const { getLogStores } = require('~/cache');
@@ -835,12 +835,7 @@ function createToolInstance({
           config?.configurable?.requestScopedConnections ?? capturedRequestScopedConnections,
         customUserVars,
         flowManager,
-        tokenMethods: {
-          findToken,
-          createToken,
-          updateToken,
-          deleteTokens,
-        },
+        tokenMethods: getTokenStoreMethods(),
         oauthStart,
         oauthEnd,
         graphTokenResolver: getGraphApiToken,

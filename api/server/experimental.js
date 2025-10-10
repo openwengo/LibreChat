@@ -45,6 +45,7 @@ const initializeMCPs = require('./services/initializeMCPs');
 const configureSocialLogins = require('./socialLogins');
 const createSpaFallback = require('./utils/fallback');
 const { getAppConfig } = require('./services/Config');
+const { initializeTokenStore } = require('./services/TokenStore');
 const staticCache = require('./utils/staticCache');
 const optionalJwtAuth = require('./middleware/optionalJwtAuth');
 const noIndex = require('./middleware/noIndex');
@@ -301,6 +302,7 @@ if (cluster.isMaster) {
 
     /** Initialize app configuration */
     const appConfig = await getAppConfig();
+    initializeTokenStore(appConfig);
     initializeFileStorage(appConfig);
     initializeGitHubSkillSync(appConfig);
     // Register configured tool-approval policy hooks (mirrors the standard startup path).

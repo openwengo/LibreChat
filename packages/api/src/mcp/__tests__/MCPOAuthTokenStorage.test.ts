@@ -5,6 +5,10 @@
  * refresh callback wiring, and ReauthenticationRequiredError paths.
  */
 
+import {
+  buildLegacyMCPOAuthTokenIdentifier,
+  buildMCPOAuthTokenIdentifier,
+} from '~/mcp/oauth/scope';
 import { MCPTokenStorage, ReauthenticationRequiredError } from '~/mcp/oauth';
 import { InMemoryTokenStore } from './helpers/oauthTestServer';
 
@@ -28,10 +32,13 @@ describe('MCPTokenStorage', () => {
   });
 
   describe('storeTokens', () => {
+    const serverName = 'srv1';
+    const identifier = buildMCPOAuthTokenIdentifier(serverName);
+
     it('should create new access token with expires_in', async () => {
       await MCPTokenStorage.storeTokens({
         userId: 'u1',
-        serverName: 'srv1',
+        serverName,
         tokens: { access_token: 'at1', token_type: 'Bearer', expires_in: 3600 },
         createToken: store.createToken,
       });
@@ -39,7 +46,7 @@ describe('MCPTokenStorage', () => {
       const saved = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth',
-        identifier: 'mcp:srv1',
+        identifier,
       });
       expect(saved).not.toBeNull();
       expect(saved!.token).toBe('enc:at1');
@@ -52,7 +59,7 @@ describe('MCPTokenStorage', () => {
       const expiresAt = Date.now() + 7200 * 1000;
       await MCPTokenStorage.storeTokens({
         userId: 'u1',
-        serverName: 'srv1',
+        serverName,
         tokens: {
           access_token: 'at1',
           token_type: 'Bearer',
@@ -65,7 +72,7 @@ describe('MCPTokenStorage', () => {
       const saved = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth',
-        identifier: 'mcp:srv1',
+        identifier,
       });
       expect(saved).not.toBeNull();
       const diff = Math.abs(saved!.expiresAt.getTime() - expiresAt);
@@ -75,7 +82,7 @@ describe('MCPTokenStorage', () => {
     it('should default to 1-year expiry when none provided', async () => {
       await MCPTokenStorage.storeTokens({
         userId: 'u1',
-        serverName: 'srv1',
+        serverName,
         tokens: { access_token: 'at1', token_type: 'Bearer' },
         createToken: store.createToken,
       });
@@ -83,7 +90,7 @@ describe('MCPTokenStorage', () => {
       const saved = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth',
-        identifier: 'mcp:srv1',
+        identifier,
       });
       const oneYearMs = 365 * 24 * 60 * 60 * 1000;
       const expiresInMs = saved!.expiresAt.getTime() - Date.now();
@@ -119,7 +126,7 @@ describe('MCPTokenStorage', () => {
     it('should store refresh token alongside access token', async () => {
       await MCPTokenStorage.storeTokens({
         userId: 'u1',
-        serverName: 'srv1',
+        serverName,
         tokens: {
           access_token: 'at1',
           token_type: 'Bearer',
@@ -132,7 +139,7 @@ describe('MCPTokenStorage', () => {
       const refreshSaved = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth_refresh',
-        identifier: 'mcp:srv1:refresh',
+        identifier: `${identifier}:refresh`,
       });
       expect(refreshSaved).not.toBeNull();
       expect(refreshSaved!.token).toBe('enc:rt1');
@@ -141,7 +148,7 @@ describe('MCPTokenStorage', () => {
     it('should skip refresh token when not in response', async () => {
       await MCPTokenStorage.storeTokens({
         userId: 'u1',
-        serverName: 'srv1',
+        serverName,
         tokens: { access_token: 'at1', token_type: 'Bearer', expires_in: 3600 },
         createToken: store.createToken,
       });
@@ -149,7 +156,7 @@ describe('MCPTokenStorage', () => {
       const refreshSaved = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth_refresh',
-        identifier: 'mcp:srv1:refresh',
+        identifier: `${identifier}:refresh`,
       });
       expect(refreshSaved).toBeNull();
     });
@@ -157,7 +164,7 @@ describe('MCPTokenStorage', () => {
     it('should store client info when provided', async () => {
       await MCPTokenStorage.storeTokens({
         userId: 'u1',
-        serverName: 'srv1',
+        serverName,
         tokens: { access_token: 'at1', token_type: 'Bearer', expires_in: 3600 },
         createToken: store.createToken,
         clientInfo: { client_id: 'cid', client_secret: 'csec' },
@@ -166,7 +173,7 @@ describe('MCPTokenStorage', () => {
       const clientSaved = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth_client',
-        identifier: 'mcp:srv1:client',
+        identifier: `${identifier}:client`,
       });
       expect(clientSaved).not.toBeNull();
       expect(clientSaved!.token).toContain('enc:');
@@ -196,7 +203,7 @@ describe('MCPTokenStorage', () => {
     it('should handle invalid NaN expiry date', async () => {
       await MCPTokenStorage.storeTokens({
         userId: 'u1',
-        serverName: 'srv1',
+        serverName,
         tokens: {
           access_token: 'at1',
           token_type: 'Bearer',
@@ -209,7 +216,7 @@ describe('MCPTokenStorage', () => {
       const saved = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth',
-        identifier: 'mcp:srv1',
+        identifier,
       });
       expect(saved).not.toBeNull();
       const oneYearMs = 365 * 24 * 60 * 60 * 1000;
@@ -515,24 +522,42 @@ describe('MCPTokenStorage', () => {
     });
 
     it('should delete client registration and refresh token on invalid_client when deleteTokens provided', async () => {
+      const serverName = 'srv1';
+      const identifier = buildMCPOAuthTokenIdentifier(serverName);
+      const legacyIdentifier = buildLegacyMCPOAuthTokenIdentifier(serverName);
+
       await store.createToken({
         userId: 'u1',
         type: 'mcp_oauth',
-        identifier: 'mcp:srv1',
+        identifier: legacyIdentifier,
         token: 'enc:expired-token',
         expiresIn: -1,
       });
       await store.createToken({
         userId: 'u1',
         type: 'mcp_oauth_refresh',
-        identifier: 'mcp:srv1:refresh',
+        identifier: `${identifier}:refresh`,
+        token: 'enc:namespaced-rt',
+        expiresIn: 86400,
+      });
+      await store.createToken({
+        userId: 'u1',
+        type: 'mcp_oauth_refresh',
+        identifier: `${legacyIdentifier}:refresh`,
         token: 'enc:rt',
         expiresIn: 86400,
       });
       await store.createToken({
         userId: 'u1',
         type: 'mcp_oauth_client',
-        identifier: 'mcp:srv1:client',
+        identifier: `${identifier}:client`,
+        token: 'enc:{"client_id":"namespaced-cid"}',
+        expiresIn: 86400,
+      });
+      await store.createToken({
+        userId: 'u1',
+        type: 'mcp_oauth_client',
+        identifier: `${legacyIdentifier}:client`,
         token: 'enc:{"client_id":"cid"}',
         expiresIn: 86400,
       });
@@ -558,16 +583,30 @@ describe('MCPTokenStorage', () => {
       const clientReg = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth_client',
-        identifier: 'mcp:srv1:client',
+        identifier: `${identifier}:client`,
       });
       expect(clientReg).toBeNull();
+
+      const legacyClientReg = await store.findToken({
+        userId: 'u1',
+        type: 'mcp_oauth_client',
+        identifier: `${legacyIdentifier}:client`,
+      });
+      expect(legacyClientReg).toBeNull();
 
       const refreshToken = await store.findToken({
         userId: 'u1',
         type: 'mcp_oauth_refresh',
-        identifier: 'mcp:srv1:refresh',
+        identifier: `${identifier}:refresh`,
       });
       expect(refreshToken).toBeNull();
+
+      const legacyRefreshToken = await store.findToken({
+        userId: 'u1',
+        type: 'mcp_oauth_refresh',
+        identifier: `${legacyIdentifier}:refresh`,
+      });
+      expect(legacyRefreshToken).toBeNull();
     });
 
     it('should return null and log warning on invalid_client when deleteTokens not provided', async () => {
