@@ -167,7 +167,7 @@ function createOpenAIImageTools(fields = {}) {
 
         resp = await openai.images.generate(
           {
-            model: 'gpt-image-1',
+            model: 'gpt-image-1.5',
             prompt: replaceUnwantedChars(prompt),
             n: Math.min(Math.max(1, n), 10),
             background,
@@ -249,7 +249,7 @@ Error Message: ${error.message}`);
       }
 
       const formData = new FormData();
-      formData.append('model', 'gpt-image-1');
+      formData.append('model', 'gpt-image-1.5');
       formData.append('prompt', replaceUnwantedChars(prompt));
       // TODO: `mask` support
       // TODO: more than 1 image support
