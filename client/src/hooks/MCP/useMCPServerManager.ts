@@ -140,6 +140,27 @@ export function useMCPServerManager({
     enabled: !isLoading && availableMCPServers.length > 0,
   });
 
+  const hasCachedTools = useCallback(
+    (serverName: string) => {
+      const mcpData = queryClient.getQueryData<MCPServersResponse | undefined>([
+        QueryKeys.mcpTools,
+      ]);
+      const tools = mcpData?.servers?.[serverName]?.tools;
+      return Array.isArray(tools);
+    },
+    [queryClient],
+  );
+
+  const canSelectWithoutConnection = useCallback(
+    (serverName: string) => {
+      const server = availableMCPServers.find((entry) => entry.serverName === serverName);
+      const type = server?.config?.type;
+      const isStreamableHttp = type === 'streamable-http' || type === 'http';
+      return isStreamableHttp && hasCachedTools(serverName);
+    },
+    [availableMCPServers, hasCachedTools],
+  );
+
   const updateServerInitState = useCallback(
     (serverName: string, updates: Partial<MCPServerInitState>) => {
       setServerInitStates((prev) => {
@@ -446,10 +467,25 @@ export function useMCPServerManager({
         const filteredValues = currentValues.filter((name) => name !== serverName);
         setMCPValues(filteredValues);
       } else {
-        setMCPValues([...currentValues, serverName]);
+        const serverStatus = connectionStatus?.[serverName];
+        if (
+          serverStatus?.connectionState === 'connected' ||
+          canSelectWithoutConnection(serverName)
+        ) {
+          setMCPValues([...currentValues, serverName]);
+        } else {
+          initializeServer(serverName);
+        }
       }
     },
-    [mcpValues, setMCPValues, isInitializing],
+    [
+      mcpValues,
+      setMCPValues,
+      connectionStatus,
+      initializeServer,
+      isInitializing,
+      canSelectWithoutConnection,
+    ],
   );
 
   const handleConfigSave = useCallback(
