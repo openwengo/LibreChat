@@ -124,6 +124,27 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     enabled: !isLoading && availableMCPServers.length > 0,
   });
 
+  const hasCachedTools = useCallback(
+    (serverName: string) => {
+      const mcpData = queryClient.getQueryData<MCPServersResponse | undefined>([
+        QueryKeys.mcpTools,
+      ]);
+      const tools = mcpData?.servers?.[serverName]?.tools;
+      return Array.isArray(tools);
+    },
+    [queryClient],
+  );
+
+  const canSelectWithoutConnection = useCallback(
+    (serverName: string) => {
+      const server = availableMCPServers.find((entry) => entry.serverName === serverName);
+      const type = server?.config?.type;
+      const isStreamableHttp = type === 'streamable-http' || type === 'http';
+      return isStreamableHttp && hasCachedTools(serverName);
+    },
+    [availableMCPServers, hasCachedTools],
+  );
+
   const updateServerInitState = useCallback(
     (serverName: string, updates: Partial<MCPServerInitState>) => {
       setServerInitStates((prev) => {
@@ -428,7 +449,10 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
         }
 
         const serverStatus = connectionStatus?.[serverName];
-        if (serverStatus?.connectionState === 'connected') {
+        if (
+          serverStatus?.connectionState === 'connected' ||
+          canSelectWithoutConnection(serverName)
+        ) {
           connectedServers.push(serverName);
         } else {
           disconnectedServers.push(serverName);
@@ -441,7 +465,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
         initializeServer(serverName);
       });
     },
-    [connectionStatus, setMCPValues, initializeServer, isInitializing],
+    [connectionStatus, setMCPValues, initializeServer, isInitializing, canSelectWithoutConnection],
   );
 
   const toggleServerSelection = useCallback(
@@ -458,14 +482,24 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
         setMCPValues(filteredValues);
       } else {
         const serverStatus = connectionStatus?.[serverName];
-        if (serverStatus?.connectionState === 'connected') {
+        if (
+          serverStatus?.connectionState === 'connected' ||
+          canSelectWithoutConnection(serverName)
+        ) {
           setMCPValues([...currentValues, serverName]);
         } else {
           initializeServer(serverName);
         }
       }
     },
-    [mcpValues, setMCPValues, connectionStatus, initializeServer, isInitializing],
+    [
+      mcpValues,
+      setMCPValues,
+      connectionStatus,
+      initializeServer,
+      isInitializing,
+      canSelectWithoutConnection,
+    ],
   );
 
   const handleConfigSave = useCallback(
