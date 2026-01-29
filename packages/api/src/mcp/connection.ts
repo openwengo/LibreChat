@@ -2527,7 +2527,7 @@ export class MCPConnection extends EventEmitter {
   /**
    * Set the current tool call ID for this connection
    */
-  setCurrentToolCallId(tool_call_id: string | undefined) {
+  setCurrentToolCallId(tool_call_id: string | undefined): void {
     this.currentToolCallId = tool_call_id;
     if (tool_call_id) {
       logger.debug(`${this.getLogPrefix()} Set current tool_call_id: ${tool_call_id}`);
@@ -2537,7 +2537,7 @@ export class MCPConnection extends EventEmitter {
   /**
    * Clear the current tool call ID (called when tool call completes)
    */
-  clearCurrentToolCallId() {
+  clearCurrentToolCallId(): void {
     if (this.currentToolCallId) {
       logger.debug(`${this.getLogPrefix()} Cleared tool_call_id: ${this.currentToolCallId}`);
       this.currentToolCallId = undefined;

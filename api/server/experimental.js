@@ -42,6 +42,7 @@ const {
 } = require('~/models');
 const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
+const { startScheduledTasksScheduler } = require('./services/ScheduledTasks');
 const configureSocialLogins = require('./socialLogins');
 const createSpaFallback = require('./utils/fallback');
 const { getAppConfig } = require('./services/Config');
@@ -457,6 +458,7 @@ if (cluster.isMaster) {
     app.use('/api/banner', routes.banner);
     app.use('/api/memories', routes.memories);
     app.use('/api/permissions', routes.accessPermissions);
+    app.use('/api/scheduled-tasks', routes.scheduledTasks);
     app.use('/api/tags', routes.tags);
     app.use('/api/mcp', routes.mcp);
 
@@ -494,6 +496,7 @@ if (cluster.isMaster) {
         await initializeMCPs();
         await initializeOAuthReconnectManager();
         await checkMigrations();
+        await startScheduledTasksScheduler(appConfig);
       } catch (initErr) {
         logger.error(`Worker ${process.pid} post-listen initialization failed:`, initErr);
         process.exit(1);

@@ -3,10 +3,7 @@ import type { TokenMethods, IUser } from '@librechat/data-schemas';
 import type { MCPOAuthTokens } from './types';
 import { MCPServersRegistry } from '~/mcp/registry/MCPServersRegistry';
 import { OAuthReconnectionTracker } from './OAuthReconnectionTracker';
-import {
-  buildLegacyMCPOAuthTokenIdentifier,
-  buildMCPOAuthTokenIdentifier,
-} from './scope';
+import { buildLegacyMCPOAuthTokenIdentifier, buildMCPOAuthTokenIdentifier } from './scope';
 import { FlowStateManager } from '~/flow/manager';
 import { MCPManager } from '~/mcp/MCPManager';
 

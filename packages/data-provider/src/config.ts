@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ZodError } from 'zod';
+import type { TScheduledTasksConfig } from './types/scheduledTasks';
 import type { TEndpointsConfig, TModelsConfig, TConfig } from './types';
 import {
   EModelEndpoint,
@@ -1577,6 +1578,7 @@ export type TStartupConfig = {
     branch?: string | null;
     buildDate?: string | null;
   };
+  scheduledTasks?: TScheduledTasksConfig;
 };
 
 export type TSharedLinkStartupInterface = Pick<
@@ -1805,6 +1807,14 @@ export const summarizationConfigSchema = z.object({
 
 export type SummarizationConfig = z.infer<typeof summarizationConfigSchema>;
 
+export const scheduledTasksConfigSchema: z.ZodType<TScheduledTasksConfig> = z.object({
+  enabled: z.boolean().optional(),
+  workerEnabled: z.boolean().optional(),
+  minIntervalMinutes: z.number().int().positive().optional(),
+  maxConcurrentRuns: z.number().int().positive().optional(),
+  maxRuntimeSeconds: z.number().int().positive().optional(),
+});
+
 const customEndpointsSchema = z.array(endpointSchema.partial()).optional();
 
 const messageFilterPiiCustomPatternSchema = z.object({
@@ -1864,6 +1874,7 @@ export const configSchema = z.object({
   memory: memorySchema.optional(),
   summarization: summarizationConfigSchema.optional(),
   skillSync: skillSyncConfigSchema,
+  scheduledTasks: scheduledTasksConfigSchema.optional(),
   secureImageLinks: z.boolean().optional(),
   imageOutputType: z.nativeEnum(EImageOutputType).default(EImageOutputType.PNG),
   includedTools: z.array(z.string()).optional(),

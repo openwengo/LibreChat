@@ -85,6 +85,9 @@ export enum QueryKeys {
   skillStates = 'skillStates',
   /* General user favorites */
   favorites = 'favorites',
+  /* Scheduled Tasks */
+  scheduledTasks = 'scheduledTasks',
+  scheduledTaskRuns = 'scheduledTaskRuns',
 }
 
 // Dynamic query keys that require parameters

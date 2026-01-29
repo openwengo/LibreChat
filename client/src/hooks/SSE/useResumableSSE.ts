@@ -1267,6 +1267,8 @@ export default function useResumableSSE(
       token,
       setAbortScroll,
       setActiveRunId,
+      setActiveElicitations,
+      setElicitationData,
       setShowStopButton,
       finalHandler,
       createdHandler,

@@ -147,6 +147,7 @@ export const AppService = async (params?: {
   const actions = config.actions;
   const registration = config.registration ?? configDefaults.registration;
   const interfaceConfig = await loadDefaultInterface({ config, configDefaults });
+  const scheduledTasks = config.scheduledTasks;
   const turnstileConfig = loadTurnstileConfig(config, configDefaults);
   const speech = config.speech;
   const messageFilter = config.messageFilter;
@@ -157,6 +158,7 @@ export const AppService = async (params?: {
     paths,
     config,
     memory,
+    scheduledTasks,
     speech,
     actions,
     balance,

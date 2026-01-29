@@ -244,9 +244,7 @@ export class MCPManager extends UserConnectionManager {
   }
 
   /** Returns all available server configurations */
-  public async getAllServers(
-    userId?: string,
-  ): Promise<Record<string, t.ParsedServerConfig>> {
+  public async getAllServers(userId?: string): Promise<Record<string, t.ParsedServerConfig>> {
     return MCPServersRegistry.getInstance().getAllServerConfigs(userId);
   }
 

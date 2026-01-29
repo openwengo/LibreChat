@@ -19,8 +19,10 @@ import { createToolCallModel } from './toolCall';
 import { createAclEntryModel } from './aclEntry';
 import { createAuditLogModel } from './auditLog';
 import { createSessionModel } from './session';
+import { createScheduledTaskModel } from './scheduledTask';
 import { createBalanceModel } from './balance';
 import { createMessageModel } from './message';
+import { createScheduledTaskRunModel } from './scheduledTaskRun';
 import { createActionModel } from './action';
 import { createBannerModel } from './banner';
 import { createPresetModel } from './preset';
@@ -82,10 +84,12 @@ export function createModels(mongoose: typeof import('mongoose')): {
     User: createUserModel(mongoose),
     Token: createTokenModel(mongoose),
     Session: createSessionModel(mongoose),
+    ScheduledTask: createScheduledTaskModel(mongoose),
     Balance: createBalanceModel(mongoose),
     Conversation: createConversationModel(mongoose),
     ChatProject: createChatProjectModel(mongoose),
     Message: createMessageModel(mongoose),
+    ScheduledTaskRun: createScheduledTaskRunModel(mongoose),
     Agent: createAgentModel(mongoose),
     AgentApiKey: createAgentApiKeyModel(mongoose),
     AgentCategory: createAgentCategoryModel(mongoose),

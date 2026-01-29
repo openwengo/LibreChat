@@ -4,6 +4,7 @@ import {
   Bot,
   Brain,
   Bookmark,
+  CalendarClock,
   NotebookPen,
   ScrollText,
   ArrowRightToLine,
@@ -32,6 +33,8 @@ import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
+import ScheduledTasksPanel from '~/components/SidePanel/ScheduledTasks/ScheduledTasksPanel';
+import { useGetStartupConfig } from '~/data-provider';
 import { PromptsAccordion } from '~/components/Prompts';
 import { SkillsAccordion } from '~/components/Skills';
 
@@ -88,6 +91,8 @@ export default function useSideNavLinks({
     permissionType: PermissionTypes.MCP_SERVERS,
     permission: Permissions.CREATE,
   });
+  const { data: startupConfig } = useGetStartupConfig();
+  const scheduledTasksEnabled = startupConfig?.scheduledTasks?.enabled !== false;
   const { availableMCPServers } = useMCPServerManager();
 
   const { agentsConfig } = useGetAgentsConfig({ endpointsConfig });
@@ -178,6 +183,16 @@ export default function useSideNavLinks({
       Component: FilesPanel,
     });
 
+    if (scheduledTasksEnabled && hasAccessToAgents) {
+      links.push({
+        title: 'com_sidepanel_scheduled_tasks',
+        label: '',
+        icon: CalendarClock,
+        id: 'scheduled-tasks',
+        Component: ScheduledTasksPanel,
+      });
+    }
+
     if (
       interfaceConfig.parameters === true &&
       isParamEndpoint(endpoint ?? '', endpointType ?? '') === true &&
@@ -236,6 +251,7 @@ export default function useSideNavLinks({
     hasAccessToCreateMCP,
     includeHidePanel,
     hidePanel,
+    scheduledTasksEnabled,
   ]);
 
   return Links;

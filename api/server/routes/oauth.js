@@ -20,6 +20,7 @@ const {
 const { createOAuthHandler } = require('~/server/controllers/auth/oauth');
 const { findBalanceByUser, upsertBalanceFields } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
+const { getGoogleScopes } = require('~/strategies/googleStrategy');
 
 const setBalanceConfig = createSetBalanceConfig({
   getAppConfig,

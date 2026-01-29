@@ -69,6 +69,7 @@ jest.mock('~/data-provider', () => ({
 
 jest.mock('~/hooks', () => ({
   useLocalize: jest.fn(() => (key: string) => key),
+  useHasAccess: jest.fn(() => true),
   useMCPConnectionStatus: jest.fn(() => ({
     connectionStatus: {},
   })),

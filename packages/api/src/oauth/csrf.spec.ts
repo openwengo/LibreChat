@@ -1,10 +1,6 @@
 import { createHmac } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
-import {
-  OAUTH_SESSION_COOKIE,
-  setOAuthSession,
-  shouldUseSecureCookie,
-} from './csrf';
+import { OAUTH_SESSION_COOKIE, setOAuthSession, shouldUseSecureCookie } from './csrf';
 
 describe('shouldUseSecureCookie', () => {
   const originalEnv = process.env;

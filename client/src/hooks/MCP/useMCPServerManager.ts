@@ -8,6 +8,7 @@ import {
   MCPOptions,
   Permissions,
   ResourceType,
+  dataService,
   PermissionTypes,
 } from 'librechat-data-provider';
 import {

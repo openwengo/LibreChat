@@ -431,11 +431,10 @@ export class MCPTokenStorage {
     const refreshTokenData =
       existingRefreshToken !== undefined
         ? existingRefreshToken
-        : await this.findTokenByIdentifiers(
-            findToken,
-            { userId, type: 'mcp_oauth_refresh' },
-            [`${identifier}:refresh`, `${legacyIdentifier}:refresh`],
-          );
+        : await this.findTokenByIdentifiers(findToken, { userId, type: 'mcp_oauth_refresh' }, [
+            `${identifier}:refresh`,
+            `${legacyIdentifier}:refresh`,
+          ]);
 
     if (!refreshTokenData) {
       logger.debug(`${logPrefix} No refresh token in storage`);
@@ -560,10 +559,7 @@ export class MCPTokenStorage {
           logger.info(
             `${logPrefix} Client registration rejected during token refresh, attempting to clear stale registration and refresh token`,
           );
-          const refreshTokenIdentifiers = [
-            `${identifier}:refresh`,
-            `${legacyIdentifier}:refresh`,
-          ];
+          const refreshTokenIdentifiers = [`${identifier}:refresh`, `${legacyIdentifier}:refresh`];
           const results = await Promise.allSettled([
             MCPTokenStorage.deleteClientRegistration({ userId, serverName, deleteTokens }),
             ...refreshTokenIdentifiers.map((tokenIdentifier) =>

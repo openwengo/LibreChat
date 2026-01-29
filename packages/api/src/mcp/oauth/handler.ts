@@ -24,21 +24,18 @@ import type {
   OAuthMetadata,
 } from './types';
 import type { FlowStateManager } from '~/flow/manager';
+import type { ParsedFlowId } from './scope';
 import {
   resolveTokenEndpointAuthMethod,
   getForcedTokenEndpointAuthMethod,
   selectRegistrationAuthMethod,
   inferClientAuthMethod,
 } from './methods';
+import { buildMCPOAuthFlowId, isMCPOAuthFlowOwnedByUser, parseMCPOAuthFlowId } from './scope';
 import { isSSRFTarget, resolveHostnameSSRF, isOAuthUrlAllowed } from '~/auth';
 import { probeResourceMetadataHint } from './resourceHint';
 import { createHardenedOAuthFetch } from './hardenedFetch';
 import { sanitizeUrlForLogging } from '~/mcp/utils';
-import {
-  buildMCPOAuthFlowId,
-  isMCPOAuthFlowOwnedByUser,
-  parseMCPOAuthFlowId,
-} from './scope';
 import { MCPTokenStorage } from './tokens';
 import { getOAuthUrlPort } from './url';
 
@@ -933,7 +930,7 @@ export class MCPOAuthHandler {
     return flowState.metadata as MCPOAuthFlowMetadata;
   }
 
-  static parseFlowId(flowId: string) {
+  static parseFlowId(flowId: string): ParsedFlowId | null {
     return parseMCPOAuthFlowId(flowId);
   }
 

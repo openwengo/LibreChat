@@ -276,6 +276,7 @@ router.get('/', async function (req, res) {
         : 0,
       ...(cloudFront ? { cloudFront } : {}),
       ...(rum ? { rum } : {}),
+      scheduledTasks: appConfig?.scheduledTasks ?? appConfig?.config?.scheduledTasks,
     };
 
     const webSearch = buildWebSearchConfig(appConfig);

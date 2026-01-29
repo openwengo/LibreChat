@@ -802,7 +802,7 @@ describe('MCPTokenStorage', () => {
         expect.objectContaining({
           userId: 'u1',
           serverName: 'srv1',
-          identifier: 'mcp:srv1',
+          identifier: buildMCPOAuthTokenIdentifier('srv1'),
         }),
         undefined,
       );

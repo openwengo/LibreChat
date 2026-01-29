@@ -50,6 +50,7 @@ const { reinitMCPServer } = require('~/server/services/Tools/mcp');
 const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { getLogStores } = require('~/cache');
 const db = require('~/models');
+const elicitationRouter = require('./mcp/elicitation');
 
 const router = Router();
 

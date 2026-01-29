@@ -13,6 +13,7 @@ import {
   summarizationConfigSchema,
   retainRecentConfigSchema,
   MAX_SUBAGENTS,
+  scheduledTasksConfigSchema,
 } from '../src/config';
 import {
   tModelSpecPresetSchema,
@@ -968,6 +969,38 @@ describe('configSchema skillSync', () => {
       });
       expect(result.success).toBe(false);
     }
+  });
+});
+
+describe('scheduledTasksConfigSchema', () => {
+  it('accepts documented scheduled task settings', () => {
+    const result = configSchema.safeParse({
+      version: '1.3.7',
+      scheduledTasks: {
+        enabled: true,
+        workerEnabled: true,
+        minIntervalMinutes: 10,
+        maxConcurrentRuns: 3,
+        maxRuntimeSeconds: 900,
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.scheduledTasks).toEqual({
+      enabled: true,
+      workerEnabled: true,
+      minIntervalMinutes: 10,
+      maxConcurrentRuns: 3,
+      maxRuntimeSeconds: 900,
+    });
+  });
+
+  it('rejects non-positive numeric limits', () => {
+    const result = scheduledTasksConfigSchema.safeParse({
+      minIntervalMinutes: 0,
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

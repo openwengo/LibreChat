@@ -36,6 +36,7 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const rum = require('./rum');
+const scheduledTasks = require('./scheduledTasks');
 
 module.exports = {
   rum,
@@ -57,6 +58,7 @@ module.exports = {
   oauth,
   files,
   share,
+  scheduledTasks,
   banner,
   agents,
   convos,

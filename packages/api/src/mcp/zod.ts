@@ -1,5 +1,12 @@
 import { z } from 'zod';
 import type { JsonSchemaType, ConvertJsonSchemaToZodOptions } from '@librechat/data-schemas';
+import type {
+  ElicitationState,
+  ElicitationRequest,
+  ElicitationResponse,
+  ElicitationRequestSchema,
+  ElicitationPropertySchema as ElicitationProperty,
+} from 'librechat-data-provider';
 
 function isEmptyObjectSchema(jsonSchema?: JsonSchemaType): boolean {
   return (
@@ -962,9 +969,13 @@ export function convertWithResolvedRefs(
 }
 
 // Elicitation Zod schemas
-export const ElicitationActionSchema = z.enum(['accept', 'decline', 'cancel']);
+export const ElicitationActionSchema: z.ZodType<ElicitationResponse['action']> = z.enum([
+  'accept',
+  'decline',
+  'cancel',
+]);
 
-export const ElicitationPropertySchema = z.object({
+export const ElicitationPropertySchema: z.ZodType<ElicitationProperty> = z.object({
   type: z.enum(['string', 'number', 'integer', 'boolean']),
   title: z.string().optional(),
   description: z.string().optional(),
@@ -978,23 +989,23 @@ export const ElicitationPropertySchema = z.object({
   enumNames: z.array(z.string()).optional(),
 });
 
-export const ElicitationRequestSchemaSchema = z.object({
+export const ElicitationRequestSchemaSchema: z.ZodType<ElicitationRequestSchema> = z.object({
   type: z.literal('object'),
   properties: z.record(z.string(), ElicitationPropertySchema),
   required: z.array(z.string()).optional(),
 });
 
-export const ElicitationCreateRequestSchema = z.object({
+export const ElicitationCreateRequestSchema: z.ZodType<ElicitationRequest> = z.object({
   message: z.string(),
   requestedSchema: ElicitationRequestSchemaSchema,
 });
 
-export const ElicitationResponseSchema = z.object({
+export const ElicitationResponseSchema: z.ZodType<ElicitationResponse> = z.object({
   action: ElicitationActionSchema,
   content: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const ElicitationStateSchema = z.object({
+export const ElicitationStateSchema: z.ZodType<ElicitationState> = z.object({
   id: z.string(),
   serverName: z.string(),
   userId: z.string(),
@@ -1003,7 +1014,10 @@ export const ElicitationStateSchema = z.object({
 });
 
 // MCP Request schema for elicitation/create
-export const ElicitationCreateMethodSchema = z.object({
+export const ElicitationCreateMethodSchema: z.ZodType<{
+  method: 'elicitation/create';
+  params: ElicitationRequest;
+}> = z.object({
   method: z.literal('elicitation/create'),
   params: ElicitationCreateRequestSchema,
 });

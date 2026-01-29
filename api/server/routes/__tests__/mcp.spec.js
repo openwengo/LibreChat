@@ -53,7 +53,6 @@ jest.mock('@librechat/api', () => {
       completeOAuthFlow: jest.fn(),
       generateFlowId: jest.fn(),
       generateTokenFlowId: jest.fn(),
-      parseFlowId: jest.fn(),
       buildStoredClientMetadata: jest.fn((metadata, resourceMetadata) =>
         metadata
           ? {

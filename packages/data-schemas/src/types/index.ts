@@ -29,6 +29,8 @@ export * from './prompts';
 /* Skills */
 export * from './skill';
 export * from './skillSync';
+/* Scheduled Tasks */
+export * from './scheduledTask';
 /* Access Control */
 export * from './accessRole';
 export * from './aclEntry';

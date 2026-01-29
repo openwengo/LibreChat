@@ -6,6 +6,7 @@ jest.mock('@librechat/data-schemas', () => ({
     info: jest.fn(),
   },
   webSearchKeys: [],
+  getTenantId: jest.fn(() => undefined),
 }));
 
 jest.mock('librechat-data-provider', () => ({
@@ -24,8 +25,10 @@ jest.mock('@librechat/api', () => ({
     message: error?.message ?? 'error',
   })),
   extractWebSearchEnvVars: jest.fn(({ keys }) => keys),
+  getAppConfigOptionsFromUser: jest.fn(() => ({})),
   MCPOAuthHandler: {
     generateFlowId: jest.fn(() => 'flow-id'),
+    generateTokenFlowId: jest.fn(() => 'flow-id'),
     revokeOAuthToken: jest.fn(),
   },
   MCPTokenStorage: {
@@ -163,6 +166,12 @@ describe('updateUserPluginsController MCP OAuth uninstall', () => {
         pluginKey: 'mcp_server1',
         action: 'uninstall',
         auth: {},
+      },
+      config: {
+        mcpSettings: {
+          allowedDomains: ['auth.example.com', 'mcp.example.com'],
+          allowedAddresses: ['10.0.0.1'],
+        },
       },
     };
 
