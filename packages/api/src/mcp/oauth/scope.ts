@@ -1,4 +1,4 @@
-interface ParsedFlowId {
+export interface ParsedFlowId {
   namespace?: string;
   userId: string;
   serverName: string;
@@ -7,7 +7,10 @@ interface ParsedFlowId {
 const DEFAULT_NAMESPACE = 'default';
 
 function sanitizeNamespace(value: string): string {
-  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
   return normalized.replace(/^-+|-+$/g, '') || DEFAULT_NAMESPACE;
 }
 
@@ -18,10 +21,14 @@ function deriveNamespaceFromDomainServer(): string {
   }
 
   try {
-    const normalized = /^https?:\/\//i.test(domainServer) ? domainServer : `https://${domainServer}`;
+    const normalized = /^https?:\/\//i.test(domainServer)
+      ? domainServer
+      : `https://${domainServer}`;
     const parsed = new URL(normalized);
     const pathname = parsed.pathname === '/' ? '' : parsed.pathname;
-    return sanitizeNamespace(`${parsed.hostname}${parsed.port ? `-${parsed.port}` : ''}${pathname}`);
+    return sanitizeNamespace(
+      `${parsed.hostname}${parsed.port ? `-${parsed.port}` : ''}${pathname}`,
+    );
   } catch {
     return sanitizeNamespace(domainServer);
   }
