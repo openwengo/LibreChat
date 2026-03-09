@@ -34,6 +34,11 @@ import { isSSRFTarget, resolveHostnameSSRF, isOAuthUrlAllowed } from '~/auth';
 import { probeResourceMetadataHint } from './resourceHint';
 import { createHardenedOAuthFetch } from './hardenedFetch';
 import { sanitizeUrlForLogging } from '~/mcp/utils';
+import {
+  buildMCPOAuthFlowId,
+  isMCPOAuthFlowOwnedByUser,
+  parseMCPOAuthFlowId,
+} from './scope';
 import { MCPTokenStorage } from './tokens';
 import { getOAuthUrlPort } from './url';
 
@@ -598,7 +603,6 @@ export class MCPOAuthHandler {
           scope: config.scope,
         });
 
-        /** Add cryptographic state parameter to the authorization URL */
         authorizationUrl.searchParams.set('state', state);
         logger.debug(`[MCPOAuth] Added state parameter to authorization URL`);
 
@@ -748,7 +752,6 @@ export class MCPOAuthHandler {
           `[MCPOAuth] Authorization URL: ${sanitizeUrlForLogging(authorizationUrl.toString())}`,
         );
 
-        /** Add cryptographic state parameter to the authorization URL */
         authorizationUrl.searchParams.set('state', state);
         logger.debug(`[MCPOAuth] Added state parameter to authorization URL`);
 
@@ -839,7 +842,7 @@ export class MCPOAuthHandler {
   static async completeOAuthFlow(
     flowId: string,
     authorizationCode: string,
-    flowManager: FlowStateManager<MCPOAuthTokens>,
+    flowManager: FlowStateManager<MCPOAuthTokens | null>,
     oauthHeaders: Record<string, string>,
   ): Promise<MCPOAuthTokens> {
     try {
@@ -921,7 +924,7 @@ export class MCPOAuthHandler {
    */
   static async getFlowState(
     flowId: string,
-    flowManager: FlowStateManager<MCPOAuthTokens>,
+    flowManager: FlowStateManager<MCPOAuthTokens | null>,
   ): Promise<MCPOAuthFlowMetadata | null> {
     const flowState = await flowManager.getFlowState(flowId, this.FLOW_TYPE);
     if (!flowState) {
@@ -930,54 +933,20 @@ export class MCPOAuthHandler {
     return flowState.metadata as MCPOAuthFlowMetadata;
   }
 
+  static parseFlowId(flowId: string) {
+    return parseMCPOAuthFlowId(flowId);
+  }
+
+  static isFlowOwnedByUser(flowId: string, userId: string): boolean {
+    return isMCPOAuthFlowOwnedByUser(flowId, userId);
+  }
+
   /**
    * Generates a flow ID for the OAuth flow
    * @returns Consistent ID so concurrent requests share the same flow
    */
   public static generateFlowId(userId: string, serverName: string, tenantId?: string): string {
-    const flowId = `${userId}:${serverName}`;
-    if (!tenantId) {
-      return flowId;
-    }
-    return `tenant:${encodeURIComponent(tenantId)}:${flowId}`;
-  }
-
-  public static parseFlowId(
-    flowId: string,
-  ): { userId: string; serverName: string; tenantId?: string } | null {
-    const parts = flowId.split(':');
-    if (parts[0] === 'tenant') {
-      if (parts.length < 4 || !parts[1] || !parts[2]) {
-        return null;
-      }
-      let tenantId: string;
-      try {
-        tenantId = decodeURIComponent(parts[1]);
-      } catch {
-        return null;
-      }
-      const serverName = parts.slice(3).join(':');
-      if (!serverName) {
-        return null;
-      }
-      return {
-        tenantId,
-        userId: parts[2],
-        serverName,
-      };
-    }
-
-    if (parts.length < 2 || !parts[0]) {
-      return null;
-    }
-    const serverName = parts.slice(1).join(':');
-    if (!serverName) {
-      return null;
-    }
-    return {
-      userId: parts[0],
-      serverName,
-    };
+    return buildMCPOAuthFlowId(userId, serverName, tenantId);
   }
 
   /** Same shape as `generateFlowId`; kept distinct so token-fetch flows can diverge from OAuth flows */

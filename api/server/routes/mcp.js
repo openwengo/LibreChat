@@ -66,7 +66,10 @@ const canAccessOAuthFlow = (flowId, userId) => {
   if (parsed.tenantId && parsed.tenantId !== getTenantId()) {
     return false;
   }
-  return parsed.userId === userId || parsed.userId === 'system';
+  return (
+    MCPOAuthHandler.isFlowOwnedByUser(flowId, userId) ||
+    MCPOAuthHandler.isFlowOwnedByUser(flowId, 'system')
+  );
 };
 
 const clearGetTokensFlow = async ({ flowManager, flowId, tokens }) => {
@@ -293,7 +296,7 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
     logger.debug('[MCP OAuth] Resolved flow ID from state', { flowId });
 
     const parsedFlowId = MCPOAuthHandler.parseFlowId(flowId);
-    if (!parsedFlowId) {
+    if (!parsedFlowId || parsedFlowId.serverName !== serverName) {
       logger.error('[MCP OAuth] Invalid flow ID format', { flowId });
       return res.redirect(`${basePath}/oauth/error?error=invalid_state`);
     }
@@ -301,6 +304,7 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
     const hasCsrf = validateOAuthCsrf(req, res, flowId, OAUTH_CSRF_COOKIE_PATH);
     const hasSession = !hasCsrf && validateOAuthSession(req, parsedFlowId.userId);
     let hasActiveFlow = false;
+
     if (!hasCsrf && !hasSession) {
       const pendingFlow = await flowManager.getFlowState(flowId, 'mcp_oauth');
       const pendingAge = pendingFlow?.createdAt ? Date.now() - pendingFlow.createdAt : Infinity;
@@ -326,7 +330,6 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
       );
       return res.redirect(`${basePath}/oauth/error?error=csrf_validation_failed`);
     }
-
     logger.debug('[MCP OAuth] Getting flow state for flowId: ' + flowId);
     const flowState = await MCPOAuthHandler.getFlowState(flowId, flowManager);
 
