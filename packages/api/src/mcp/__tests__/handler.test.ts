@@ -93,6 +93,19 @@ describe('MCPOAuthHandler - Configurable OAuth Metadata', () => {
       );
     });
 
+    it('should use a random OAuth state distinct from the flow ID', async () => {
+      const result = await MCPOAuthHandler.initiateOAuthFlow(
+        mockServerName,
+        mockServerUrl,
+        mockUserId,
+        {},
+        baseConfig,
+      );
+
+      expect(new URL(result.authorizationUrl).searchParams.get('state')).toBe(result.flowMetadata.state);
+      expect(result.flowMetadata.state).not.toBe(result.flowId);
+    });
+
     it('should use custom grant_types_supported when provided', async () => {
       const config = {
         ...baseConfig,

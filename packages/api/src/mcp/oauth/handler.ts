@@ -25,6 +25,12 @@ import {
   inferClientAuthMethod,
 } from './methods';
 import { isSSRFTarget, resolveHostnameSSRF, isOAuthUrlAllowed } from '~/auth';
+import {
+  buildMCPOAuthFlowId,
+  isMCPOAuthFlowOwnedByUser,
+  parseMCPOAuthFlowId,
+} from './scope';
+import { isSSRFTarget, resolveHostnameSSRF, isOAuthUrlAllowed } from '~/auth';
 import { sanitizeUrlForLogging } from '~/mcp/utils';
 
 /** Type for the OAuth metadata from the SDK */
@@ -32,7 +38,6 @@ type SDKOAuthMetadata = Parameters<typeof registerClient>[1]['metadata'];
 
 export class MCPOAuthHandler {
   private static readonly FLOW_TYPE = 'mcp_oauth';
-  private static readonly FLOW_TTL = 10 * 60 * 1000; // 10 minutes
 
   /**
    * Creates a fetch function with custom headers injected
@@ -455,7 +460,6 @@ export class MCPOAuthHandler {
           scope: config.scope,
         });
 
-        /** Add cryptographic state parameter to the authorization URL */
         authorizationUrl.searchParams.set('state', state);
         logger.debug(`[MCPOAuth] Added state parameter to authorization URL`);
 
@@ -534,7 +538,6 @@ export class MCPOAuthHandler {
           `[MCPOAuth] Authorization URL: ${sanitizeUrlForLogging(authorizationUrl.toString())}`,
         );
 
-        /** Add cryptographic state parameter to the authorization URL */
         authorizationUrl.searchParams.set('state', state);
         logger.debug(`[MCPOAuth] Added state parameter to authorization URL`);
 
@@ -606,7 +609,7 @@ export class MCPOAuthHandler {
   static async completeOAuthFlow(
     flowId: string,
     authorizationCode: string,
-    flowManager: FlowStateManager<MCPOAuthTokens>,
+    flowManager: FlowStateManager<MCPOAuthTokens | null>,
     oauthHeaders: Record<string, string>,
   ): Promise<MCPOAuthTokens> {
     try {
@@ -681,7 +684,7 @@ export class MCPOAuthHandler {
    */
   static async getFlowState(
     flowId: string,
-    flowManager: FlowStateManager<MCPOAuthTokens>,
+    flowManager: FlowStateManager<MCPOAuthTokens | null>,
   ): Promise<MCPOAuthFlowMetadata | null> {
     const flowState = await flowManager.getFlowState(flowId, this.FLOW_TYPE);
     if (!flowState) {
@@ -690,12 +693,20 @@ export class MCPOAuthHandler {
     return flowState.metadata as MCPOAuthFlowMetadata;
   }
 
+  static parseFlowId(flowId: string) {
+    return parseMCPOAuthFlowId(flowId);
+  }
+
+  static isFlowOwnedByUser(flowId: string, userId: string): boolean {
+    return isMCPOAuthFlowOwnedByUser(flowId, userId);
+  }
+
   /**
    * Generates a flow ID for the OAuth flow
    * @returns Consistent ID so concurrent requests share the same flow
    */
   public static generateFlowId(userId: string, serverName: string): string {
-    return `${userId}:${serverName}`;
+    return buildMCPOAuthFlowId(userId, serverName);
   }
 
   /**

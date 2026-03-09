@@ -172,17 +172,17 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
     }
     logger.debug('[MCP OAuth] Resolved flow ID from state', { flowId });
 
-    const flowParts = flowId.split(':');
-    if (flowParts.length < 2 || !flowParts[0] || !flowParts[1]) {
+    const parsedFlowId = MCPOAuthHandler.parseFlowId(flowId);
+    if (!parsedFlowId || parsedFlowId.serverName !== serverName) {
       logger.error('[MCP OAuth] Invalid flow ID format', { flowId });
       return res.redirect(`${basePath}/oauth/error?error=invalid_state`);
     }
 
-    const [flowUserId] = flowParts;
-
+    const flowUserId = parsedFlowId.userId;
     const hasCsrf = validateOAuthCsrf(req, res, flowId, OAUTH_CSRF_COOKIE_PATH);
     const hasSession = !hasCsrf && validateOAuthSession(req, flowUserId);
     let hasActiveFlow = false;
+
     if (!hasCsrf && !hasSession) {
       const pendingFlow = await flowManager.getFlowState(flowId, 'mcp_oauth');
       const pendingAge = pendingFlow?.createdAt ? Date.now() - pendingFlow.createdAt : Infinity;
@@ -208,7 +208,6 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
       );
       return res.redirect(`${basePath}/oauth/error?error=csrf_validation_failed`);
     }
-
     logger.debug('[MCP OAuth] Getting flow state for flowId: ' + flowId);
     const flowState = await MCPOAuthHandler.getFlowState(flowId, flowManager);
 
@@ -350,7 +349,10 @@ router.get('/oauth/tokens/:flowId', requireJwtAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!flowId.startsWith(`${user.id}:`) && !flowId.startsWith('system:')) {
+    if (
+      !MCPOAuthHandler.isFlowOwnedByUser(flowId, user.id) &&
+      !MCPOAuthHandler.isFlowOwnedByUser(flowId, 'system')
+    ) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -410,7 +412,10 @@ router.get('/oauth/status/:flowId', requireJwtAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!flowId.startsWith(`${user.id}:`) && !flowId.startsWith('system:')) {
+    if (
+      !MCPOAuthHandler.isFlowOwnedByUser(flowId, user.id) &&
+      !MCPOAuthHandler.isFlowOwnedByUser(flowId, 'system')
+    ) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

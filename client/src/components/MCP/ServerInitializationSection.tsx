@@ -27,6 +27,7 @@ export default function ServerInitializationSection({
     isCancellable,
     isInitializing,
     cancelOAuthFlow,
+    continueOAuth,
     initializeServer,
     availableMCPServers,
     revokeOAuthForServer,
@@ -61,11 +62,7 @@ export default function ServerInitializationSection({
           >
             {localize('com_ui_cancel')}
           </Button>
-          <Button
-            variant="submit"
-            onClick={() => window.open(serverOAuthUrl, '_blank', 'noopener,noreferrer')}
-            className="flex-1"
-          >
+          <Button variant="submit" onClick={() => continueOAuth(serverName)} className="flex-1">
             {localize('com_ui_continue_oauth')}
           </Button>
         </div>

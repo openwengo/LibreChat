@@ -1,4 +1,10 @@
-import { shouldUseSecureCookie } from './csrf';
+import { createHmac } from 'crypto';
+import type { NextFunction, Request, Response } from 'express';
+import {
+  OAUTH_SESSION_COOKIE,
+  setOAuthSession,
+  shouldUseSecureCookie,
+} from './csrf';
 
 describe('shouldUseSecureCookie', () => {
   const originalEnv = process.env;
@@ -95,5 +101,72 @@ describe('shouldUseSecureCookie', () => {
       process.env.DOMAIN_SERVER = 'http://LOCALHOST:3080';
       expect(shouldUseSecureCookie()).toBe(false);
     });
+  });
+});
+
+describe('setOAuthSession', () => {
+  const next = jest.fn() as jest.MockedFunction<NextFunction>;
+  const userId = 'user-123';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  afterAll(() => {
+    delete process.env.JWT_SECRET;
+  });
+
+  function createRequest(cookieValue?: string): Request {
+    return {
+      cookies: cookieValue ? { [OAUTH_SESSION_COOKIE]: cookieValue } : {},
+      user: { id: userId },
+    } as Request & { user: { id: string } };
+  }
+
+  function createResponse(): Response {
+    return {
+      cookie: jest.fn(),
+    } as unknown as Response;
+  }
+
+  it('sets the session cookie when it is missing', () => {
+    const req = createRequest();
+    const res = createResponse();
+
+    setOAuthSession(req, res, next);
+
+    expect(res.cookie).toHaveBeenCalledTimes(1);
+    expect(res.cookie).toHaveBeenCalledWith(
+      OAUTH_SESSION_COOKIE,
+      expect.any(String),
+      expect.objectContaining({ path: '/api' }),
+    );
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the session cookie when the existing cookie is invalid', () => {
+    const req = createRequest('stale-cookie');
+    const res = createResponse();
+
+    setOAuthSession(req, res, next);
+
+    expect(res.cookie).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the current session cookie when it already validates', () => {
+    const res = createResponse();
+    const validReq = createRequest(
+      createHmac('sha256', process.env.JWT_SECRET as string)
+        .update(userId)
+        .digest('hex')
+        .slice(0, 32),
+    );
+
+    setOAuthSession(validReq, res, next);
+
+    expect(res.cookie).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });

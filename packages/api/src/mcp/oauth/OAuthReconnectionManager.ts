@@ -2,6 +2,10 @@ import { logger } from '@librechat/data-schemas';
 import type { TokenMethods, IUser } from '@librechat/data-schemas';
 import type { MCPOAuthTokens } from './types';
 import { OAuthReconnectionTracker } from './OAuthReconnectionTracker';
+import {
+  buildLegacyMCPOAuthTokenIdentifier,
+  buildMCPOAuthTokenIdentifier,
+} from './scope';
 import { FlowStateManager } from '~/flow/manager';
 import { MCPManager } from '~/mcp/MCPManager';
 import { MCPServersRegistry } from '~/mcp/registry/MCPServersRegistry';
@@ -192,13 +196,17 @@ export class OAuthReconnectionManager {
       }
     }
 
-    // if the server has a valid (non-expired) access token, allow reconnect
-    const accessToken = await this.tokenMethods.findToken({
-      userId,
-      type: 'mcp_oauth',
-      identifier: `mcp:${serverName}`,
-    });
-
+    const accessToken =
+      (await this.tokenMethods.findToken({
+        userId,
+        type: 'mcp_oauth',
+        identifier: buildMCPOAuthTokenIdentifier(serverName),
+      })) ??
+      (await this.tokenMethods.findToken({
+        userId,
+        type: 'mcp_oauth',
+        identifier: buildLegacyMCPOAuthTokenIdentifier(serverName),
+      }));
     if (accessToken != null) {
       const now = new Date();
       if (!accessToken.expiresAt || accessToken.expiresAt >= now) {
@@ -206,12 +214,17 @@ export class OAuthReconnectionManager {
       }
     }
 
-    // if the access token is expired or TTL-deleted, fall back to refresh token
-    const refreshToken = await this.tokenMethods.findToken({
-      userId,
-      type: 'mcp_oauth',
-      identifier: `mcp:${serverName}:refresh`,
-    });
+    const refreshToken =
+      (await this.tokenMethods.findToken({
+        userId,
+        type: 'mcp_oauth_refresh',
+        identifier: `${buildMCPOAuthTokenIdentifier(serverName)}:refresh`,
+      })) ??
+      (await this.tokenMethods.findToken({
+        userId,
+        type: 'mcp_oauth_refresh',
+        identifier: `${buildLegacyMCPOAuthTokenIdentifier(serverName)}:refresh`,
+      }));
 
     if (refreshToken == null) {
       return false;

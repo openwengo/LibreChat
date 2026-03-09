@@ -1,6 +1,10 @@
 import { Types } from 'mongoose';
 import { decryptV2 } from '@librechat/data-schemas';
 import type { TokenMethods, IToken } from '@librechat/data-schemas';
+import {
+  buildLegacyMCPOAuthTokenIdentifier,
+  buildMCPOAuthTokenIdentifier,
+} from '~/mcp/oauth/scope';
 import { MCPTokenStorage } from '~/mcp/oauth/tokens';
 
 jest.mock('@librechat/data-schemas', () => ({
@@ -22,6 +26,8 @@ describe('MCPTokenStorage', () => {
   describe('deleteUserTokens', () => {
     const userId = '000000001111111122222222';
     const serverName = 'test-server';
+    const identifier = buildMCPOAuthTokenIdentifier(serverName);
+    const legacyIdentifier = buildLegacyMCPOAuthTokenIdentifier(serverName);
     let mockDeleteToken: jest.MockedFunction<
       (filter: { userId: string; type: string; identifier: string }) => Promise<void>
     >;
@@ -38,22 +44,36 @@ describe('MCPTokenStorage', () => {
         deleteToken: mockDeleteToken,
       });
 
-      // Verify all three token types were deleted with correct identifiers
-      expect(mockDeleteToken).toHaveBeenCalledTimes(3);
-      expect(mockDeleteToken).toHaveBeenCalledWith({
+      expect(mockDeleteToken).toHaveBeenCalledTimes(6);
+      expect(mockDeleteToken).toHaveBeenNthCalledWith(1, {
         userId,
         type: 'mcp_oauth_client',
-        identifier: `mcp:${serverName}:client`,
+        identifier: `${identifier}:client`,
       });
-      expect(mockDeleteToken).toHaveBeenCalledWith({
+      expect(mockDeleteToken).toHaveBeenNthCalledWith(2, {
         userId,
         type: 'mcp_oauth',
-        identifier: `mcp:${serverName}`,
+        identifier,
       });
-      expect(mockDeleteToken).toHaveBeenCalledWith({
+      expect(mockDeleteToken).toHaveBeenNthCalledWith(3, {
         userId,
         type: 'mcp_oauth_refresh',
-        identifier: `mcp:${serverName}:refresh`,
+        identifier: `${identifier}:refresh`,
+      });
+      expect(mockDeleteToken).toHaveBeenNthCalledWith(4, {
+        userId,
+        type: 'mcp_oauth_client',
+        identifier: `${legacyIdentifier}:client`,
+      });
+      expect(mockDeleteToken).toHaveBeenNthCalledWith(5, {
+        userId,
+        type: 'mcp_oauth',
+        identifier: legacyIdentifier,
+      });
+      expect(mockDeleteToken).toHaveBeenNthCalledWith(6, {
+        userId,
+        type: 'mcp_oauth_refresh',
+        identifier: `${legacyIdentifier}:refresh`,
       });
     });
 
@@ -75,7 +95,7 @@ describe('MCPTokenStorage', () => {
   describe('getClientInfoAndMetadata', () => {
     const userId = '000000001111111122222222';
     const serverName = 'test-server';
-    const identifier = `mcp:${serverName}`;
+    const identifier = buildMCPOAuthTokenIdentifier(serverName);
     let mockFindToken: jest.MockedFunction<TokenMethods['findToken']>;
 
     beforeEach(() => {
@@ -106,7 +126,7 @@ describe('MCPTokenStorage', () => {
         client_secret: 'test-secret',
       };
 
-      const metadata = new Map([
+      const metadata = new Map<string, unknown>([
         ['serverUrl', 'https://test.example.com'],
         ['state', 'test-state'],
         ['encrypted', true],

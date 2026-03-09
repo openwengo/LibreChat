@@ -2,6 +2,10 @@ import { logger, encryptV2, decryptV2 } from '@librechat/data-schemas';
 import type { OAuthTokens, OAuthClientInformation } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { TokenMethods, IToken } from '@librechat/data-schemas';
 import type { MCPOAuthTokens, ExtendedOAuthTokens, OAuthMetadata } from './types';
+import {
+  buildLegacyMCPOAuthTokenIdentifier,
+  buildMCPOAuthTokenIdentifier,
+} from './scope';
 import { isSystemUserId } from '~/mcp/enum';
 
 export class ReauthenticationRequiredError extends Error {
@@ -51,6 +55,25 @@ interface GetTokensParams {
 
 export class MCPTokenStorage {
   private static encryptTokens = true;
+
+  private static getTokenIdentifiers(serverName: string): [string, string] {
+    return [buildMCPOAuthTokenIdentifier(serverName), buildLegacyMCPOAuthTokenIdentifier(serverName)];
+  }
+
+  private static async findTokenByIdentifiers(
+    findToken: TokenMethods['findToken'],
+    query: { userId: string; type: string },
+    identifiers: string[],
+  ): Promise<IToken | null> {
+    for (const identifier of identifiers) {
+      const token = await findToken({ ...query, identifier });
+      if (token) {
+        return token;
+      }
+    }
+
+    return null;
+  }
 
   static setEncryptionPreference(shouldEncrypt: boolean): void {
     this.encryptTokens = shouldEncrypt;
@@ -137,7 +160,7 @@ export class MCPTokenStorage {
     const logPrefix = this.getLogPrefix(userId, serverName);
 
     try {
-      const identifier = `mcp:${serverName}`;
+      const [identifier, legacyIdentifier] = this.getTokenIdentifiers(serverName);
       const shouldEncrypt = this.encryptTokens;
 
       // Encrypt and store access token
@@ -192,10 +215,13 @@ export class MCPTokenStorage {
         const existingToken =
           existingTokens?.accessToken !== undefined
             ? existingTokens.accessToken
-            : await findToken({ userId, identifier });
+            : await this.findTokenByIdentifiers(findToken, { userId, type: 'mcp_oauth' }, [
+                identifier,
+                legacyIdentifier,
+              ]);
 
         if (existingToken) {
-          await updateToken({ userId, identifier }, accessTokenData);
+          await updateToken({ userId, identifier: existingToken.identifier }, accessTokenData);
           logger.debug(`${logPrefix} Updated existing access token`);
         } else {
           await createToken(accessTokenData);
@@ -238,13 +264,17 @@ export class MCPTokenStorage {
           const existingRefreshToken =
             existingTokens?.refreshToken !== undefined
               ? existingTokens.refreshToken
-              : await findToken({
-                  userId,
-                  identifier: `${identifier}:refresh`,
-                });
+              : await this.findTokenByIdentifiers(
+                  findToken,
+                  { userId, type: 'mcp_oauth_refresh' },
+                  [`${identifier}:refresh`, `${legacyIdentifier}:refresh`],
+                );
 
           if (existingRefreshToken) {
-            await updateToken({ userId, identifier: `${identifier}:refresh` }, refreshTokenData);
+            await updateToken(
+              { userId, identifier: existingRefreshToken.identifier },
+              refreshTokenData,
+            );
             logger.debug(`${logPrefix} Updated existing refresh token`);
           } else {
             await createToken(refreshTokenData);
@@ -287,13 +317,17 @@ export class MCPTokenStorage {
           const existingClientInfo =
             existingTokens?.clientInfoToken !== undefined
               ? existingTokens.clientInfoToken
-              : await findToken({
-                  userId,
-                  identifier: `${identifier}:client`,
-                });
+              : await this.findTokenByIdentifiers(
+                  findToken,
+                  { userId, type: 'mcp_oauth_client' },
+                  [`${identifier}:client`, `${legacyIdentifier}:client`],
+                );
 
           if (existingClientInfo) {
-            await updateToken({ userId, identifier: `${identifier}:client` }, clientInfoData);
+            await updateToken(
+              { userId, identifier: existingClientInfo.identifier },
+              clientInfoData,
+            );
             logger.debug(`${logPrefix} Updated existing client info`);
           } else {
             await createToken(clientInfoData);
@@ -331,14 +365,14 @@ export class MCPTokenStorage {
     const logPrefix = this.getLogPrefix(userId, serverName);
 
     try {
-      const identifier = `mcp:${serverName}`;
+      const [identifier, legacyIdentifier] = this.getTokenIdentifiers(serverName);
 
       // Get access token
-      const accessTokenData = await findToken({
-        userId,
-        type: 'mcp_oauth',
-        identifier,
-      });
+      const accessTokenData = await this.findTokenByIdentifiers(
+        findToken,
+        { userId, type: 'mcp_oauth' },
+        [identifier, legacyIdentifier],
+      );
 
       /** Check if access token is missing or expired */
       const isMissing = !accessTokenData;
@@ -348,11 +382,11 @@ export class MCPTokenStorage {
         logger.info(`${logPrefix} Access token ${isMissing ? 'missing' : 'expired'}`);
 
         /** Refresh data if we have a refresh token and refresh function */
-        const refreshTokenData = await findToken({
-          userId,
-          type: 'mcp_oauth_refresh',
-          identifier: `${identifier}:refresh`,
-        });
+        const refreshTokenData = await this.findTokenByIdentifiers(
+          findToken,
+          { userId, type: 'mcp_oauth_refresh' },
+          [`${identifier}:refresh`, `${legacyIdentifier}:refresh`],
+        );
 
         if (!refreshTokenData) {
           const reason = isMissing ? 'missing' : 'expired';
@@ -388,11 +422,11 @@ export class MCPTokenStorage {
           let storedTokenEndpoint: string | undefined;
           let storedAuthMethods: string[] | undefined;
           try {
-            clientInfoData = await findToken({
-              userId,
-              type: 'mcp_oauth_client',
-              identifier: `${identifier}:client`,
-            });
+            clientInfoData = await this.findTokenByIdentifiers(
+              findToken,
+              { userId, type: 'mcp_oauth_client' },
+              [`${identifier}:client`, `${legacyIdentifier}:client`],
+            );
             if (clientInfoData) {
               const decryptedClientInfo = await this.decodeToken(
                 clientInfoData.token,
@@ -483,11 +517,11 @@ export class MCPTokenStorage {
       );
 
       /** Get refresh token if available */
-      const refreshTokenData = await findToken({
-        userId,
-        type: 'mcp_oauth_refresh',
-        identifier: `${identifier}:refresh`,
-      });
+      const refreshTokenData = await this.findTokenByIdentifiers(
+        findToken,
+        { userId, type: 'mcp_oauth_refresh' },
+        [`${identifier}:refresh`, `${legacyIdentifier}:refresh`],
+      );
 
       const tokens: MCPOAuthTokens = {
         access_token: decryptedAccessToken,
@@ -526,13 +560,13 @@ export class MCPTokenStorage {
     clientInfo: OAuthClientInformation;
     clientMetadata: Record<string, unknown>;
   } | null> {
-    const identifier = `mcp:${serverName}`;
+    const [identifier, legacyIdentifier] = this.getTokenIdentifiers(serverName);
 
-    const clientInfoData: IToken | null = await findToken({
-      userId,
-      type: 'mcp_oauth_client',
-      identifier: `${identifier}:client`,
-    });
+    const clientInfoData = await this.findTokenByIdentifiers(
+      findToken,
+      { userId, type: 'mcp_oauth_client' },
+      [`${identifier}:client`, `${legacyIdentifier}:client`],
+    );
     if (clientInfoData == null) {
       return null;
     }
@@ -572,27 +606,26 @@ export class MCPTokenStorage {
     serverName: string;
     deleteToken: (filter: { userId: string; type: string; identifier: string }) => Promise<void>;
   }): Promise<void> {
-    const identifier = `mcp:${serverName}`;
+    const [identifier, legacyIdentifier] = this.getTokenIdentifiers(serverName);
 
-    // delete client info token
-    await deleteToken({
-      userId,
-      type: 'mcp_oauth_client',
-      identifier: `${identifier}:client`,
-    });
+    for (const tokenIdentifier of [identifier, legacyIdentifier]) {
+      await deleteToken({
+        userId,
+        type: 'mcp_oauth_client',
+        identifier: `${tokenIdentifier}:client`,
+      });
 
-    // delete access token
-    await deleteToken({
-      userId,
-      type: 'mcp_oauth',
-      identifier,
-    });
+      await deleteToken({
+        userId,
+        type: 'mcp_oauth',
+        identifier: tokenIdentifier,
+      });
 
-    // delete refresh token
-    await deleteToken({
-      userId,
-      type: 'mcp_oauth_refresh',
-      identifier: `${identifier}:refresh`,
-    });
+      await deleteToken({
+        userId,
+        type: 'mcp_oauth_refresh',
+        identifier: `${tokenIdentifier}:refresh`,
+      });
+    }
   }
 }

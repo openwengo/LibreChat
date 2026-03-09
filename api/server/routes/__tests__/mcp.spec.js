@@ -23,6 +23,17 @@ const mockRegistryInstance = {
   removeServer: jest.fn(),
 };
 
+function mockParseTestFlowId(flowId) {
+  const parts = flowId.split(':');
+  if (parts.length === 2) {
+    return { userId: parts[0], serverName: parts[1] };
+  }
+  if (parts.length >= 3) {
+    return { namespace: parts[0], userId: parts[1], serverName: parts.slice(2).join(':') };
+  }
+  return null;
+}
+
 jest.mock('@librechat/api', () => {
   const actual = jest.requireActual('@librechat/api');
   return {
@@ -35,7 +46,12 @@ jest.mock('@librechat/api', () => {
       resolveStateToFlowId: jest.fn(async (state) => state),
       storeStateMapping: jest.fn(),
       deleteStateMapping: jest.fn(),
+      parseFlowId: jest.fn((flowId) => mockParseTestFlowId(flowId)),
+      isFlowOwnedByUser: jest.fn(
+        (flowId, userId) => mockParseTestFlowId(flowId)?.userId === userId,
+      ),
     },
+    PENDING_STALE_MS: 2 * 60 * 1000,
     MCPTokenStorage: {
       storeTokens: jest.fn(),
       getClientInfoAndMetadata: jest.fn(),
@@ -425,6 +441,11 @@ describe('MCP Routes', () => {
           clearReconnection: jest.fn(),
         });
         require('~/server/services/Config/mcp').updateMCPServerTools.mockResolvedValue();
+        MCPOAuthHandler.resolveStateToFlowId.mockResolvedValueOnce(flowId);
+        MCPOAuthHandler.parseFlowId.mockReturnValueOnce({
+          userId: 'test-user-id',
+          serverName: 'test-server',
+        });
 
         const response = await request(app)
           .get('/api/mcp/test-server/oauth/callback')
@@ -551,14 +572,16 @@ describe('MCP Routes', () => {
       setCachedTools.mockResolvedValue();
 
       const flowId = 'test-user-id:test-server';
+      const opaqueState = 'opaque-oauth-state';
       const csrfToken = generateTestCsrfToken(flowId);
+      MCPOAuthHandler.resolveStateToFlowId.mockResolvedValueOnce(flowId);
 
       const response = await request(app)
         .get('/api/mcp/test-server/oauth/callback')
         .set('Cookie', [`oauth_csrf=${csrfToken}`])
         .query({
           code: 'test-auth-code',
-          state: flowId,
+          state: opaqueState,
         });
       const basePath = getBasePath();
 
