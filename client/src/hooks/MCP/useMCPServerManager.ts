@@ -262,6 +262,20 @@ export function useMCPServerManager({
     [updateServerInitState],
   );
 
+  const openMCPOAuthWindow = useCallback(async (serverName: string, oauthUrl: string | null) => {
+    if (!oauthUrl) {
+      return;
+    }
+
+    try {
+      await dataService.bindMCPOAuth(serverName);
+    } catch (error) {
+      console.error(`[MCP Manager] Failed to bind OAuth for ${serverName}:`, error);
+    }
+
+    window.open(oauthUrl, '_blank', 'noopener,noreferrer');
+  }, []);
+
   const startServerPolling = useCallback(
     (serverName: string, flowId?: string, initialOAuthTimeout?: number) => {
       // Prevent duplicate polling for the same server
@@ -514,7 +528,7 @@ export function useMCPServerManager({
           });
 
           if (autoOpenOAuth) {
-            window.open(response.oauthUrl, '_blank', 'noopener,noreferrer');
+            await openMCPOAuthWindow(serverName, response.oauthUrl);
           }
 
           startServerPolling(serverName, response.flowId, response.oauthTimeout);
@@ -558,6 +572,7 @@ export function useMCPServerManager({
       localize,
       mcpValues,
       cleanupServerState,
+      openMCPOAuthWindow,
       setMCPValues,
     ],
   );
@@ -627,6 +642,16 @@ export function useMCPServerManager({
       return getServerInitState(serverInitStates, serverName).oauthUrl;
     },
     [serverInitStates],
+  );
+
+  const continueOAuth = useCallback(
+    async (serverName: string) => {
+      await openMCPOAuthWindow(
+        serverName,
+        getServerInitState(serverInitStates, serverName).oauthUrl,
+      );
+    },
+    [openMCPOAuthWindow, serverInitStates],
   );
 
   const placeholderText = useMemo(
@@ -842,6 +867,7 @@ export function useMCPServerManager({
     connectionStatus,
     initializeServer,
     cancelOAuthFlow,
+    continueOAuth,
     isInitializing,
     isCancellable,
     isConnectionDeferred,

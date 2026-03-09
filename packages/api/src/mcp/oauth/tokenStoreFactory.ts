@@ -1,3 +1,4 @@
+import { scopeMCPOAuthTokenMethods } from './scope';
 import type { TTokenStoreConfig } from 'librechat-data-provider';
 import { MCPTokenStorage } from './tokens';
 import {
@@ -21,17 +22,17 @@ export function configureTokenStore({
 
   switch (backend) {
     case 'aws-parameter':
-      return createParameterStoreTokenMethods({
+      return scopeMCPOAuthTokenMethods(createParameterStoreTokenMethods({
         awsConfig: config?.aws,
         retry: config?.aws?.retry,
-      });
+      }));
     case 'aws-secrets':
-      return createSecretsManagerTokenMethods({
+      return scopeMCPOAuthTokenMethods(createSecretsManagerTokenMethods({
         awsConfig: config?.aws,
         retry: config?.aws?.retry,
-      });
+      }));
     case 'mongo':
     default:
-      return defaultMethods;
+      return scopeMCPOAuthTokenMethods(defaultMethods);
   }
 }
