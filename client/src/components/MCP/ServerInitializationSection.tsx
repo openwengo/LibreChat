@@ -3,7 +3,6 @@ import { RefreshCw, Trash2 } from 'lucide-react';
 import { Button, Spinner } from '@librechat/client';
 import { useLocalize, useMCPServerManager } from '~/hooks';
 import { useMCPRefresh } from '~/hooks/MCP/useMCPRefresh';
-import { openInNewTab } from '~/utils';
 
 interface ServerInitializationSectionProps {
   sidePanel?: boolean;
@@ -29,6 +28,7 @@ export default function ServerInitializationSection({
     isCancellable,
     isInitializing,
     cancelOAuthFlow,
+    continueOAuth,
     initializeServer,
     availableMCPServers,
     availableMCPServersMap,
@@ -98,7 +98,7 @@ export default function ServerInitializationSection({
           >
             {localize('com_ui_cancel')}
           </Button>
-          <Button variant="submit" onClick={() => openInNewTab(serverOAuthUrl)} className="flex-1">
+          <Button variant="submit" onClick={() => continueOAuth(serverName)} className="flex-1">
             {localize('com_ui_continue_oauth')}
           </Button>
         </div>
