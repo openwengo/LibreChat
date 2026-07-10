@@ -1225,7 +1225,7 @@ export class MCPTokenStorage {
         logger.info(`${logPrefix} Refresh grant is no longer valid. New authentication required.`);
         return null;
       }
-      if (isInvalidClientMessage(errorMessage)) {
+      if (isInvalidClientMessage(errorMessage) || normalizedErrorMessage.includes('invalid_scope')) {
         if (deleteTokens) {
           logger.info(
             `${logPrefix} Client registration rejected during token refresh, attempting to clear stale registration and refresh token`,
