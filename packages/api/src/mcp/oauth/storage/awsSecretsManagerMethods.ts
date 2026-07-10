@@ -6,6 +6,7 @@ import {
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 import { logger } from '@librechat/data-schemas';
+import type { TokenQuery } from '@librechat/data-schemas';
 import type { MCPTokenMethods, TokenMethodFactoryOptions, TokenRecordPayload } from './types';
 import {
   buildResourceName,
@@ -42,8 +43,8 @@ export function createSecretsManagerTokenMethods({
     } as unknown as import('@librechat/data-schemas').IToken;
   };
 
-  const loadRecord = async (query: { userId?: string | null; identifier?: string | null }) => {
-    if (!query.userId || !query.identifier) {
+  const loadRecord = async (query: TokenQuery) => {
+    if (!query.userId || typeof query.identifier !== 'string') {
       return null;
     }
 
@@ -166,7 +167,11 @@ export function createSecretsManagerTokenMethods({
     }
 
     const identifiers = [] as string[];
-    if (query.identifier) {
+    if (query.identifier instanceof RegExp) {
+      logger.warn('[SecretsManager] deleteTokens does not support RegExp identifiers.');
+      return { deletedCount: 0 };
+    }
+    if (typeof query.identifier === 'string') {
       identifiers.push(query.identifier);
     } else {
       // Secrets Manager has no list-by-prefix without pagination; rely on known identifiers set by caller
@@ -177,17 +182,25 @@ export function createSecretsManagerTokenMethods({
     let count = 0;
     for (const identifier of identifiers) {
       const name = buildResourceName(prefix, String(query.userId), identifier);
-      await withRetry(
-        () =>
-          client.send(
+      const deleted = await withRetry(async () => {
+        try {
+          await client.send(
             new DeleteSecretCommand({
               SecretId: name,
               ForceDeleteWithoutRecovery: true,
             }),
-          ),
-        retryOptions,
-      );
-      count++;
+          );
+          return true;
+        } catch (error) {
+          if ((error as Error).name === 'ResourceNotFoundException') {
+            return false;
+          }
+          throw error;
+        }
+      }, retryOptions);
+      if (deleted) {
+        count++;
+      }
     }
 
     return { deletedCount: count };

@@ -10,6 +10,7 @@ import {
   requiresUserScopedConnection,
   canUseAppConnection,
   canBackfillSharedServerInstructions,
+  getOAuthCredentialFailure,
   isInvalidClientMessage,
   isClientRejectionMessage,
   getMissingCustomUserVars,
@@ -665,8 +666,28 @@ describe('isClientRejectionMessage', () => {
     expect(isClientRejectionMessage('unauthorized_client')).toBe(true);
   });
 
+  it('should match invalid_scope from a reused client registration', () => {
+    expect(isClientRejectionMessage('OAuth authorization failed: invalid_scope')).toBe(true);
+  });
+
   it('should return false for unrelated messages', () => {
     expect(isClientRejectionMessage('server error')).toBe(false);
+  });
+});
+
+describe('getOAuthCredentialFailure', () => {
+  it.each([
+    ['invalid_grant', 'invalid_grant'],
+    ['invalid_scope', 'invalid_scope'],
+    ['invalid_client', 'invalid_client'],
+    ['unauthorized_client', 'invalid_client'],
+    ['client not found', 'invalid_client'],
+  ] as const)('should classify "%s" as %s', (message, expected) => {
+    expect(getOAuthCredentialFailure(`Token refresh failed: ${message}`)).toBe(expected);
+  });
+
+  it('should return null for a transient failure', () => {
+    expect(getOAuthCredentialFailure('connection timeout')).toBeNull();
   });
 });
 
