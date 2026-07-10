@@ -419,6 +419,10 @@ describe('MCPOAuthHandler - client registration reuse on reconnection', () => {
       expect(MCPConnectionFactory.isClientRejection(new Error('unauthorized_client'))).toBe(true);
     });
 
+    it('should detect invalid_scope errors', () => {
+      expect(MCPConnectionFactory.isClientRejection(new Error('invalid_scope'))).toBe(true);
+    });
+
     it('should detect client_id mismatch errors', () => {
       expect(
         MCPConnectionFactory.isClientRejection(

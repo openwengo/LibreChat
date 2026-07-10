@@ -1140,9 +1140,10 @@ export class MCPConnectionFactory {
 
   /**
    * Checks whether an error indicates the OAuth client registration was rejected.
-   * Includes RFC 6749 §5.2 standard codes (`invalid_client`, `unauthorized_client`)
+   * Includes RFC 6749 standard codes (`invalid_client`, `unauthorized_client`, `invalid_scope`)
    * and known vendor-specific patterns (Okta: `client_id mismatch`, Auth0: `client not found`,
-   * generic: `unknown client`).
+   * generic: `unknown client`). `invalid_scope` is only acted on when the flow reused a stored
+   * client, so a freshly registered client's configuration is never deleted speculatively.
    */
   static isClientRejection(error: unknown): boolean {
     if (!error || typeof error !== 'object') {

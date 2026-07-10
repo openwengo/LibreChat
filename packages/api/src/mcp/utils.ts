@@ -384,6 +384,8 @@ const INVALID_CLIENT_PATTERNS = [
   'unknown client',
 ] as const;
 
+export type OAuthCredentialFailure = 'invalid_grant' | 'invalid_scope' | 'invalid_client';
+
 /** Checks whether a message indicates the stored client registration is invalid/stale. */
 export function isInvalidClientMessage(message: string): boolean {
   const msg = message.toLowerCase();
@@ -392,11 +394,31 @@ export function isInvalidClientMessage(message: string): boolean {
 
 /**
  * Checks whether a message indicates the OAuth client registration was rejected.
- * Superset of `isInvalidClientMessage`: also matches `unauthorized_client`
- * (grant-type refusal), which has different recovery semantics.
+ * Superset of `isInvalidClientMessage`: also matches `unauthorized_client` and
+ * `invalid_scope`. Callers only discard a registration known to have been reused.
  */
 export function isClientRejectionMessage(message: string): boolean {
-  return isInvalidClientMessage(message) || message.toLowerCase().includes('unauthorized_client');
+  const normalized = message.toLowerCase();
+  return (
+    isInvalidClientMessage(normalized) ||
+    normalized.includes('unauthorized_client') ||
+    normalized.includes('invalid_scope')
+  );
+}
+
+/** Classifies terminal OAuth credential failures that require a fresh authorization flow. */
+export function getOAuthCredentialFailure(message: string): OAuthCredentialFailure | null {
+  const normalized = message.toLowerCase();
+  if (normalized.includes('invalid_grant')) {
+    return 'invalid_grant';
+  }
+  if (normalized.includes('invalid_scope')) {
+    return 'invalid_scope';
+  }
+  if (isInvalidClientMessage(normalized) || normalized.includes('unauthorized_client')) {
+    return 'invalid_client';
+  }
+  return null;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   SSMClient,
 } from '@aws-sdk/client-ssm';
 import { logger } from '@librechat/data-schemas';
+import type { TokenQuery } from '@librechat/data-schemas';
 import type { MCPTokenMethods, TokenMethodFactoryOptions, TokenRecordPayload } from './types';
 import {
   buildResourceName,
@@ -46,8 +47,8 @@ export function createParameterStoreTokenMethods({
     } as unknown as import('@librechat/data-schemas').IToken;
   };
 
-  const loadRecord = async (query: { userId?: string | null; identifier?: string | null }) => {
-    if (!query.userId || !query.identifier) {
+  const loadRecord = async (query: TokenQuery) => {
+    if (!query.userId || typeof query.identifier !== 'string') {
       return null;
     }
 
@@ -179,7 +180,12 @@ export function createParameterStoreTokenMethods({
 
     const targets: string[] = [];
 
-    if (query.identifier && query.userId) {
+    if (query.identifier instanceof RegExp) {
+      logger.warn('[ParameterStore] deleteTokens does not support RegExp identifiers.');
+      return { deletedCount: 0 };
+    }
+
+    if (typeof query.identifier === 'string' && query.userId) {
       targets.push(buildResourceName(prefix, String(query.userId), query.identifier));
     } else if (query.userId) {
       const userPath = `${prefix}/${sanitizeSegment(String(query.userId))}`;
@@ -208,8 +214,20 @@ export function createParameterStoreTokenMethods({
 
     let count = 0;
     for (const name of targets) {
-      await withRetry(() => client.send(new DeleteParameterCommand({ Name: name })), retryOptions);
-      count++;
+      const deleted = await withRetry(async () => {
+        try {
+          await client.send(new DeleteParameterCommand({ Name: name }));
+          return true;
+        } catch (error) {
+          if ((error as Error).name === 'ParameterNotFound') {
+            return false;
+          }
+          throw error;
+        }
+      }, retryOptions);
+      if (deleted) {
+        count++;
+      }
     }
 
     return { deletedCount: count };

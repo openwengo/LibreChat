@@ -4,15 +4,29 @@ import type { OAuthTokens, OAuthClientInformation } from '@modelcontextprotocol/
 import type { TokenMethods, IToken } from '@librechat/data-schemas';
 import type { MCPOAuthTokens, ExtendedOAuthTokens, OAuthStoredClientMetadata } from './types';
 import { buildLegacyMCPOAuthTokenIdentifier, buildMCPOAuthTokenIdentifier } from './scope';
-import { isInvalidClientMessage } from '~/mcp/utils';
+import { getOAuthCredentialFailure } from '~/mcp/utils';
 import { isSystemUserId } from '~/mcp/enum';
 
+type ReauthenticationReason =
+  | 'expired'
+  | 'missing'
+  | 'invalid_grant'
+  | 'invalid_scope'
+  | 'invalid_client';
+
 export class ReauthenticationRequiredError extends Error {
-  constructor(serverName: string, reason: 'expired' | 'missing' | 'invalid_client') {
-    const detail =
-      reason === 'invalid_client'
-        ? 'stored client registration is no longer valid'
-        : `access token ${reason} and no refresh token available`;
+  constructor(
+    serverName: string,
+    public readonly reason: ReauthenticationReason,
+  ) {
+    const details: Record<ReauthenticationReason, string> = {
+      expired: 'access token expired and no refresh token available',
+      missing: 'access token missing and no refresh token available',
+      invalid_grant: 'stored refresh grant is no longer valid',
+      invalid_scope: 'stored OAuth scope is no longer accepted',
+      invalid_client: 'stored client registration is no longer valid',
+    };
+    const detail = details[reason];
     super(`Re-authentication required for "${serverName}": ${detail}`);
     this.name = 'ReauthenticationRequiredError';
   }
@@ -54,7 +68,7 @@ interface GetTokensParams {
   ) => Promise<MCPOAuthTokens>;
   createToken?: TokenMethods['createToken'];
   updateToken?: TokenMethods['updateToken'];
-  /** Enables cleanup of stale client registration and refresh token on invalid_client errors during refresh. */
+  /** Enables stale credential cleanup after terminal OAuth refresh errors. */
   deleteTokens?: TokenMethods['deleteTokens'];
   signal?: AbortSignal;
 }
@@ -119,6 +133,46 @@ export class MCPTokenStorage {
     return isSystemUserId(userId)
       ? `[MCP][${serverName}]`
       : `[MCP][User: ${userId}][${serverName}]`;
+  }
+
+  private static getTokenDeletionFilters(
+    userId: string,
+    serverName: string,
+  ): Array<{ userId: string; type: string; identifier: string }> {
+    const [identifier, legacyIdentifier] = this.getTokenIdentifiers(serverName);
+    return [identifier, legacyIdentifier].flatMap((tokenIdentifier) => [
+      {
+        userId,
+        type: 'mcp_oauth_client',
+        identifier: `${tokenIdentifier}:client`,
+      },
+      { userId, type: 'mcp_oauth', identifier: tokenIdentifier },
+      {
+        userId,
+        type: 'mcp_oauth_refresh',
+        identifier: `${tokenIdentifier}:refresh`,
+      },
+    ]);
+  }
+
+  private static async clearRejectedCredentialSet({
+    userId,
+    serverName,
+    deleteTokens,
+  }: {
+    userId: string;
+    serverName: string;
+    deleteTokens: TokenMethods['deleteTokens'];
+  }): Promise<void> {
+    const logPrefix = this.getLogPrefix(userId, serverName);
+    const results = await Promise.allSettled(
+      this.getTokenDeletionFilters(userId, serverName).map((filter) => deleteTokens(filter)),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        logger.warn(`${logPrefix} Failed to clear stale OAuth credential`, result.reason);
+      }
+    }
   }
 
   private static buildMetadata(base?: unknown): Map<string, unknown> {
@@ -547,38 +601,23 @@ export class MCPTokenStorage {
       return newTokens;
     } catch (refreshError) {
       logger.error(`${logPrefix} Failed to refresh tokens`, refreshError);
-      // Check if it's an unauthorized_client error (refresh not supported)
       const errorMessage =
         refreshError instanceof Error ? refreshError.message : String(refreshError);
+      const credentialFailure = getOAuthCredentialFailure(errorMessage);
+      if (credentialFailure && deleteTokens) {
+        logger.info(
+          `${logPrefix} Refresh failed with ${credentialFailure}; clearing stored OAuth credentials before re-authentication`,
+        );
+        await this.clearRejectedCredentialSet({ userId, serverName, deleteTokens });
+        throw new ReauthenticationRequiredError(serverName, credentialFailure);
+      }
       if (errorMessage.toLowerCase().includes('unauthorized_client')) {
         logger.info(
           `${logPrefix} Server does not support refresh tokens for this client. New authentication required.`,
         );
-      } else if (isInvalidClientMessage(errorMessage)) {
-        if (deleteTokens) {
-          logger.info(
-            `${logPrefix} Client registration rejected during token refresh, attempting to clear stale registration and refresh token`,
-          );
-          const refreshTokenIdentifiers = [`${identifier}:refresh`, `${legacyIdentifier}:refresh`];
-          const results = await Promise.allSettled([
-            MCPTokenStorage.deleteClientRegistration({ userId, serverName, deleteTokens }),
-            ...refreshTokenIdentifiers.map((tokenIdentifier) =>
-              deleteTokens({
-                userId,
-                type: 'mcp_oauth_refresh',
-                identifier: tokenIdentifier,
-              }),
-            ),
-          ]);
-          for (const r of results) {
-            if (r.status === 'rejected') {
-              logger.warn(`${logPrefix} Failed to clear stale token data`, r.reason);
-            }
-          }
-          throw new ReauthenticationRequiredError(serverName, 'invalid_client');
-        }
+      } else if (credentialFailure) {
         logger.warn(
-          `${logPrefix} Client registration rejected during token refresh but deleteTokens not available — stale registration cannot be cleared`,
+          `${logPrefix} Refresh failed with ${credentialFailure} but deleteTokens not available — stale OAuth credentials cannot be cleared`,
         );
       }
       return null;
@@ -769,26 +808,8 @@ export class MCPTokenStorage {
     serverName: string;
     deleteToken: (filter: { userId: string; type: string; identifier: string }) => Promise<void>;
   }): Promise<void> {
-    const [identifier, legacyIdentifier] = this.getTokenIdentifiers(serverName);
-
-    for (const tokenIdentifier of [identifier, legacyIdentifier]) {
-      await deleteToken({
-        userId,
-        type: 'mcp_oauth_client',
-        identifier: `${tokenIdentifier}:client`,
-      });
-
-      await deleteToken({
-        userId,
-        type: 'mcp_oauth',
-        identifier: tokenIdentifier,
-      });
-
-      await deleteToken({
-        userId,
-        type: 'mcp_oauth_refresh',
-        identifier: `${tokenIdentifier}:refresh`,
-      });
+    for (const filter of this.getTokenDeletionFilters(userId, serverName)) {
+      await deleteToken(filter);
     }
   }
 }
