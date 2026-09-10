@@ -1,9 +1,10 @@
 import pick from 'lodash/pick';
+import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
-import type { ElicitationState, ElicitationResponse } from 'librechat-data-provider';
 import { logger } from '@librechat/data-schemas';
 import { Permissions, PermissionTypes } from 'librechat-data-provider';
 import { CallToolResultSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitationState, ElicitationResponse } from 'librechat-data-provider';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { TokenMethods, IUser } from '@librechat/data-schemas';
 import type {
@@ -12,6 +13,7 @@ import type {
   UpstreamTokenProvider,
   UpstreamTokenProviderResolver,
 } from '~/mcp/oauth/obo';
+import type { CallToolRequestOptions } from './types/request';
 import type { AuthIdentityContext } from '~/utils/identity';
 import type { GraphTokenResolver } from '~/utils/graph';
 import type { FlowStateManager } from '~/flow/manager';
@@ -104,7 +106,7 @@ export class MCPManager extends UserConnectionManager {
   private eventEmitter: EventEmitter = new EventEmitter();
   private elicitationStates: Map<string, ElicitationState> = new Map();
   private pendingElicitations: Map<string, (response: unknown) => void> = new Map();
-  private handlerSetupMap: Map<MCPConnection, string> = new Map();
+  private handlerSetupMap: WeakMap<MCPConnection, string> = new WeakMap();
   private readonly catalogRecoveryTracker: MCPServerCatalogRecoveryTracker;
   private readonly recoveryCancellation = new WeakMap<
     Promise<void>,
@@ -1150,7 +1152,7 @@ Please follow these instructions when using tools from the respective MCP server
     onOAuthCredentialsChanged?: t.UserConnectionContext['onOAuthCredentialsChanged'];
     onOAuthCredentialsChanging?: t.UserConnectionContext['onOAuthCredentialsChanging'];
   }): Promise<t.FormattedToolResponse> {
-    const toolCallId = (options as t.LibreChatRequestOptions)?.tool_call_id;
+    const toolCallId = (options as CallToolRequestOptions)?.tool_call_id;
     const userId = user?.id;
     const logPrefix = userId ? `[MCP][User: ${userId}][${serverName}]` : `[MCP][${serverName}]`;
     this.bindRequestScopedConnectionStore(requestScopedConnections);
@@ -1679,6 +1681,7 @@ Please follow these instructions when using tools from the respective MCP server
       }
     }
   }
+
   subscribeToElicitations(userId: string, listener: (state: ElicitationState) => void): () => void {
     const onCreated = (event: { elicitationId: string; userId: string }): void => {
       const state = this.getElicitationState(event.elicitationId);
@@ -1687,7 +1690,9 @@ Please follow these instructions when using tools from the respective MCP server
       }
     };
     this.eventEmitter.on('elicitationCreated', onCreated);
-    return () => { this.eventEmitter.removeListener('elicitationCreated', onCreated); };
+    return () => {
+      this.eventEmitter.removeListener('elicitationCreated', onCreated);
+    };
   }
 
   on(event: string, listener: (...args: unknown[]) => void): this {
@@ -1792,7 +1797,7 @@ Please follow these instructions when using tools from the respective MCP server
         );
         logger.info(`[MCP][${serverName}] Event context:`, eventData.context);
 
-        const elicitationId = `${serverName}_${effectiveUserId}_${Date.now()}`;
+        const elicitationId = randomUUID();
         const toolCallIdFromEvent = eventData.context?.tool_call_id;
 
         logger.info(`[MCP][${serverName}] Tool call ID: ${toolCallIdFromEvent}`);
@@ -1822,5 +1827,4 @@ Please follow these instructions when using tools from the respective MCP server
       `[MCP][${serverName}] Set up elicitation handler for connection with contextUserId: ${contextUserId}`,
     );
   }
-
 }

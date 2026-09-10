@@ -3,7 +3,6 @@ const { CacheKeys } = require('librechat-data-provider');
 const { MCPOAuthHandler, MCPTokenStorage, cleanupMCPServerOAuth } = require('@librechat/api');
 const { getFlowStateManager, getMCPServersRegistry } = require('~/config');
 const { getLogStores } = require('~/cache');
-const db = require('~/models');
 
 const maybeUninstallOAuthMCP = async (userId, pluginKey, appConfig, serverConfigOverride) => {
   const registry = getMCPServersRegistry();

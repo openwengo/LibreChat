@@ -1389,62 +1389,65 @@ describe('MCPTokenStorage', () => {
       }
     });
 
-    it('should delete client registration and refresh token on invalid_client when deleteTokens provided', async () => {
-      await createBoundToken(store, {
-        userId: 'u1',
-        type: 'mcp_oauth',
-        identifier: 'mcp:srv1',
-        token: 'enc:expired-token',
-        expiresIn: -1,
-      });
-      await createBoundToken(store, {
-        userId: 'u1',
-        type: 'mcp_oauth_refresh',
-        identifier: 'mcp:srv1:refresh',
-        token: 'enc:rt',
-        expiresIn: 86400,
-      });
-      await createBoundToken(store, {
-        userId: 'u1',
-        type: 'mcp_oauth_client',
-        identifier: 'mcp:srv1:client',
-        token: 'enc:{"client_id":"cid"}',
-        expiresIn: 86400,
-        metadata: storedBindingMetadata,
-      });
-
-      const refreshTokens = jest.fn().mockRejectedValue(new Error('invalid_client'));
-
-      await expect(
-        MCPTokenStorage.getTokens({
+    it.each(['invalid_client', 'invalid_scope'])(
+      'should conditionally clear rejected client credentials on %s',
+      async (failure) => {
+        await createBoundToken(store, {
           userId: 'u1',
-          serverName: 'srv1',
-          findToken: store.findToken,
-          createToken: store.createToken,
-          deleteTokens: store.deleteTokens,
-          refreshTokens,
-        }),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          name: 'ReauthenticationRequiredError',
-          message: expect.stringContaining('stored client registration is no longer valid'),
-        }),
-      );
+          type: 'mcp_oauth',
+          identifier: 'mcp:srv1',
+          token: 'enc:expired-token',
+          expiresIn: -1,
+        });
+        await createBoundToken(store, {
+          userId: 'u1',
+          type: 'mcp_oauth_refresh',
+          identifier: 'mcp:srv1:refresh',
+          token: 'enc:rt',
+          expiresIn: 86400,
+        });
+        await createBoundToken(store, {
+          userId: 'u1',
+          type: 'mcp_oauth_client',
+          identifier: 'mcp:srv1:client',
+          token: 'enc:{"client_id":"cid"}',
+          expiresIn: 86400,
+          metadata: storedBindingMetadata,
+        });
 
-      const clientReg = await store.findToken({
-        userId: 'u1',
-        type: 'mcp_oauth_client',
-        identifier: 'mcp:srv1:client',
-      });
-      expect(clientReg).toBeNull();
+        const refreshTokens = jest.fn().mockRejectedValue(new Error(failure));
 
-      const refreshToken = await store.findToken({
-        userId: 'u1',
-        type: 'mcp_oauth_refresh',
-        identifier: 'mcp:srv1:refresh',
-      });
-      expect(refreshToken).toBeNull();
-    });
+        await expect(
+          MCPTokenStorage.getTokens({
+            userId: 'u1',
+            serverName: 'srv1',
+            findToken: store.findToken,
+            createToken: store.createToken,
+            deleteTokens: store.deleteTokens,
+            refreshTokens,
+          }),
+        ).rejects.toThrow(
+          expect.objectContaining({
+            name: 'ReauthenticationRequiredError',
+            message: expect.stringContaining('stored client registration is no longer valid'),
+          }),
+        );
+
+        const clientReg = await store.findToken({
+          userId: 'u1',
+          type: 'mcp_oauth_client',
+          identifier: 'mcp:srv1:client',
+        });
+        expect(clientReg).toBeNull();
+
+        const refreshToken = await store.findToken({
+          userId: 'u1',
+          type: 'mcp_oauth_refresh',
+          identifier: 'mcp:srv1:refresh',
+        });
+        expect(refreshToken).toBeNull();
+      },
+    );
 
     it('should return null and log warning on invalid_client when deleteTokens not provided', async () => {
       const { logger } = await import('@librechat/data-schemas');

@@ -1,11 +1,12 @@
+import { logger } from '@librechat/data-schemas';
 import {
   CreateSecretCommand,
   DeleteSecretCommand,
   GetSecretValueCommand,
+  ListSecretsCommand,
   PutSecretValueCommand,
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
-import { logger } from '@librechat/data-schemas';
 import type { TokenQuery } from '@librechat/data-schemas';
 import type { MCPTokenMethods, TokenMethodFactoryOptions, TokenRecordPayload } from './types';
 import {
@@ -18,6 +19,7 @@ import {
   toTokenRecordPayload,
   withRetry,
 } from './awsUtils';
+import { matchesTokenQuery } from './guards';
 
 export function createSecretsManagerTokenMethods({
   awsConfig,
@@ -60,7 +62,8 @@ export function createSecretsManagerTokenMethods({
         return null;
       }
 
-      return JSON.parse(response.SecretString) as TokenRecordPayload;
+      const record = JSON.parse(response.SecretString) as TokenRecordPayload;
+      return matchesTokenQuery(record, query) ? record : null;
     } catch (error) {
       const code = (error as Error & { name?: string }).name;
       if (code === 'ResourceNotFoundException') {
@@ -109,7 +112,17 @@ export function createSecretsManagerTokenMethods({
     const record = toTokenRecordPayload(tokenData, createdAt, expiresAt, encrypted);
     const name = buildResourceName(prefix, String(tokenData.userId), tokenData.identifier);
 
-    await upsertSecret(name, record);
+    await withRetry(
+      () =>
+        client.send(
+          new CreateSecretCommand({
+            Name: name,
+            SecretString: JSON.stringify(record),
+            KmsKeyId: kmsKeyId,
+          }),
+        ),
+      retryOptions,
+    );
 
     return toToken(record);
   };
@@ -139,8 +152,7 @@ export function createSecretsManagerTokenMethods({
       createdAt: record.createdAt,
       expiresAt,
       metadata: {
-        ...(record.metadata ?? {}),
-        ...metadataToObject(updateData.metadata),
+        ...(metadataToObject(updateData.metadata) ?? record.metadata ?? {}),
         encrypted,
       },
       encrypted,
@@ -174,13 +186,44 @@ export function createSecretsManagerTokenMethods({
     if (typeof query.identifier === 'string') {
       identifiers.push(query.identifier);
     } else {
-      // Secrets Manager has no list-by-prefix without pagination; rely on known identifiers set by caller
-      logger.warn('[SecretsManager] deleteTokens without identifier will not remove tokens.');
-      return { deletedCount: 0 };
+      const userPrefix = buildResourceName(prefix, String(query.userId), '').slice(0, -1);
+      let nextToken: string | undefined;
+      do {
+        const page = await withRetry(
+          () =>
+            client.send(
+              new ListSecretsCommand({
+                Filters: [{ Key: 'name', Values: [userPrefix] }],
+                NextToken: nextToken,
+              }),
+            ),
+          retryOptions,
+        );
+        for (const secret of page.SecretList ?? []) {
+          if (!secret.Name?.startsWith(userPrefix)) {
+            continue;
+          }
+          const response = await withRetry(
+            () => client.send(new GetSecretValueCommand({ SecretId: secret.Name })),
+            retryOptions,
+          );
+          if (!response.SecretString) {
+            continue;
+          }
+          const record = JSON.parse(response.SecretString) as TokenRecordPayload;
+          if (record.identifier && matchesTokenQuery(record, query)) {
+            identifiers.push(record.identifier);
+          }
+        }
+        nextToken = page.NextToken;
+      } while (nextToken);
     }
 
     let count = 0;
     for (const identifier of identifiers) {
+      if (!(await loadRecord({ ...query, identifier }))) {
+        continue;
+      }
       const name = buildResourceName(prefix, String(query.userId), identifier);
       const deleted = await withRetry(async () => {
         try {

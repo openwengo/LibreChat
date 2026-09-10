@@ -1,5 +1,5 @@
-import type { TokenCreateData, TokenMethods } from '@librechat/data-schemas';
 import type { TAwsTokenStoreConfig, TokenStoreBackend } from 'librechat-data-provider';
+import type { TokenCreateData, TokenMethods } from '@librechat/data-schemas';
 
 export type MCPTokenMethods = Pick<
   TokenMethods,

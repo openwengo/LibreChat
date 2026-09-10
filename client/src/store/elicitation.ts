@@ -1,5 +1,5 @@
-import type { ElicitationState } from 'librechat-data-provider';
 import { atom } from 'recoil';
+import type { ElicitationState } from 'librechat-data-provider';
 
 export interface ActiveElicitation {
   id: string;

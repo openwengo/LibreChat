@@ -14,12 +14,12 @@ import { cn, getToolDisplayLabel, logger, openInNewTab } from '~/utils';
 import { ToolIcon, getToolIconType, isError } from './ToolOutput';
 import { useMCPIconMap, useMCPServerNames } from '~/hooks/MCP';
 import { resolveToolCallPhase } from '~/utils/toolCallPhase';
+import { useElicitation } from '~/hooks/Chat/useElicitation';
 import { toolPanelSpacingClassName } from './disclosure';
 import { useToolCallIntent } from './Parts/intent';
+import ElicitationForm from './ElicitationForm';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
-import ElicitationForm from './ElicitationForm';
-import { useElicitation } from '~/hooks/Chat/useElicitation';
 import ProgressText from './ProgressText';
 import { TOOL_ROW_CLASSES } from './rows';
 import { ToolAuthWarning } from './auth';
@@ -55,7 +55,8 @@ export default function ToolCall({
   runStepDurationMs?: PartMetadata['runStepDurationMs'];
 }) {
   const localize = useLocalize();
-  const { activeElicitation, hasActiveElicitation, respondToElicitation } = useElicitation(toolCallId);
+  const { activeElicitation, hasActiveElicitation, respondToElicitation } =
+    useElicitation(toolCallId);
   const [oauthError, setOAuthError] = useState<string | null>(null);
   const [oauthBinding, setOAuthBinding] = useState<'pending' | 'bound' | 'failed'>('pending');
   const autoExpand = useRecoilValue(store.autoExpandTools);

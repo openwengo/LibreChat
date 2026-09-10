@@ -21,13 +21,13 @@ import type {
 import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
 import { clearComposerDrafts, applyPendingAction, findPendingActionMessageIndex } from '~/utils';
+import { activeElicitationsState, elicitationDataState } from '~/store/elicitation';
 import { pendingApprovalActionFamily } from '~/components/Chat/approval/state';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { startedAsNewConversation } from './useEventHandlers';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import useUsageHandler from './useUsageHandler';
-import { activeElicitationsState, elicitationDataState } from '~/store/elicitation';
 import store from '~/store';
 
 type ChatHelpers = Pick<

@@ -1,3 +1,4 @@
+const { getMCPManager } = require('~/config');
 const { logger, tenantStorage, createChatExpirationDate } = require('@librechat/data-schemas');
 const { v5: uuidv5 } = require('uuid');
 const {

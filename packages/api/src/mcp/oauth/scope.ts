@@ -1,5 +1,5 @@
-import type { TokenMethods } from '@librechat/data-schemas';
-interface ParsedFlowId {
+import type { TokenQuery, TokenMethods } from '@librechat/data-schemas';
+export interface ParsedFlowId {
   namespace?: string;
   tenantId?: string;
   userId: string;
@@ -9,7 +9,10 @@ interface ParsedFlowId {
 const DEFAULT_NAMESPACE = 'default';
 
 function sanitizeNamespace(value: string): string {
-  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
   return normalized.replace(/^-+|-+$/g, '') || DEFAULT_NAMESPACE;
 }
 
@@ -20,10 +23,14 @@ function deriveNamespaceFromDomainServer(): string {
   }
 
   try {
-    const normalized = /^https?:\/\//i.test(domainServer) ? domainServer : `https://${domainServer}`;
+    const normalized = /^https?:\/\//i.test(domainServer)
+      ? domainServer
+      : `https://${domainServer}`;
     const parsed = new URL(normalized);
     const pathname = parsed.pathname === '/' ? '' : parsed.pathname;
-    return sanitizeNamespace(`${parsed.hostname}${parsed.port ? `-${parsed.port}` : ''}${pathname}`);
+    return sanitizeNamespace(
+      `${parsed.hostname}${parsed.port ? `-${parsed.port}` : ''}${pathname}`,
+    );
   } catch {
     return sanitizeNamespace(domainServer);
   }
@@ -37,14 +44,10 @@ export function getMCPOAuthNamespace(): string {
   return deriveNamespaceFromDomainServer();
 }
 
-export function buildMCPOAuthFlowId(
-  userId: string,
-  serverName: string,
-  tenantId?: string,
-): string {
+export function buildMCPOAuthFlowId(userId: string, serverName: string, tenantId?: string): string {
   const namespace = getMCPOAuthNamespace();
   if (tenantId) {
-    return `${namespace}:tenant:${encodeURIComponent(tenantId)}:${userId}:${serverName}`;
+    return `tenant:${encodeURIComponent(tenantId)}:${userId}:${serverName}`;
   }
   return `${namespace}:${userId}:${serverName}`;
 }
@@ -121,15 +124,29 @@ export function buildLegacyMCPOAuthTokenIdentifier(serverName: string): string {
 
 export function scopeMCPOAuthTokenMethods(methods: TokenMethods): TokenMethods {
   const prefix = `mcp:${getMCPOAuthNamespace()}:`;
-  const scopeIdentifier = (identifier?: string): string | undefined =>
-    identifier?.startsWith('mcp:') ? `${prefix}${identifier.slice(4)}` : identifier;
+  const scopeIdentifier = (identifier: TokenQuery['identifier']): TokenQuery['identifier'] =>
+    typeof identifier === 'string' && identifier.startsWith('mcp:')
+      ? `${prefix}${identifier.slice(4)}`
+      : identifier;
   return {
-    findToken: (query, options) => methods.findToken({ ...query, identifier: scopeIdentifier(query.identifier) }, options),
-    createToken: (data) => methods.createToken({ ...data, identifier: scopeIdentifier(data.identifier) }),
-    updateToken: (query, data) => methods.updateToken(
-      { ...query, identifier: scopeIdentifier(query.identifier) },
-      { ...data, ...(data.identifier !== undefined && { identifier: scopeIdentifier(data.identifier) }) },
-    ),
-    deleteTokens: (query) => methods.deleteTokens({ ...query, identifier: scopeIdentifier(query.identifier) }),
+    findToken: (query, options) =>
+      methods.findToken({ ...query, identifier: scopeIdentifier(query.identifier) }, options),
+    createToken: (data) =>
+      methods.createToken({
+        ...data,
+        identifier: scopeIdentifier(data.identifier) as string | undefined,
+      }),
+    updateToken: (query, data) =>
+      methods.updateToken(
+        { ...query, identifier: scopeIdentifier(query.identifier) },
+        {
+          ...data,
+          ...(data.identifier !== undefined && {
+            identifier: scopeIdentifier(data.identifier) as string | undefined,
+          }),
+        },
+      ),
+    deleteTokens: (query) =>
+      methods.deleteTokens({ ...query, identifier: scopeIdentifier(query.identifier) }),
   };
 }

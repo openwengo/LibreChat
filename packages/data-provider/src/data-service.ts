@@ -23,10 +23,10 @@ import * as q from './types/queries';
 import * as sk from './types/skills';
 import * as f from './types/files';
 import * as config from './config';
+import * as mc from './types/mcp';
 import request from './request';
 import * as s from './schemas';
 import * as r from './roles';
-import * as mc from './types/mcp';
 
 export function getInsights(params: TInsightsParams = {}): Promise<TInsightsResponse> {
   const query = new URLSearchParams();
