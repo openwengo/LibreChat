@@ -1,3 +1,4 @@
+import { logger } from '@librechat/data-schemas';
 import {
   DeleteParameterCommand,
   GetParameterCommand,
@@ -6,7 +7,6 @@ import {
   PutParameterCommand,
   SSMClient,
 } from '@aws-sdk/client-ssm';
-import { logger } from '@librechat/data-schemas';
 import type { TokenQuery } from '@librechat/data-schemas';
 import type { MCPTokenMethods, TokenMethodFactoryOptions, TokenRecordPayload } from './types';
 import {
@@ -20,6 +20,7 @@ import {
   toTokenRecordPayload,
   withRetry,
 } from './awsUtils';
+import { matchesTokenQuery } from './guards';
 
 const ACCESS_TYPE = 'SecureString';
 
@@ -65,7 +66,7 @@ export function createParameterStoreTokenMethods({
       }
 
       const record = JSON.parse(response.Parameter.Value) as TokenRecordPayload;
-      return record;
+      return matchesTokenQuery(record, query) ? record : null;
     } catch (error) {
       const message = (error as Error)?.name || '';
       if (message === 'ParameterNotFound') {
@@ -87,8 +88,11 @@ export function createParameterStoreTokenMethods({
     const record = toTokenRecordPayload(tokenData, createdAt, expiresAt, encrypted);
     const name = buildResourceName(prefix, String(tokenData.userId), tokenData.identifier);
 
+    if (await loadRecord({ userId: tokenData.userId, identifier: tokenData.identifier })) {
+      throw new Error('An OAuth credential already exists at this parameter');
+    }
     const payload = JSON.stringify(record);
-    const tier = payload.length > 4096 ? 'Advanced' : undefined;
+    const tier = Buffer.byteLength(payload, 'utf8') > 4096 ? 'Advanced' : undefined;
 
     await withRetry(
       () =>
@@ -96,7 +100,7 @@ export function createParameterStoreTokenMethods({
           new PutParameterCommand({
             Name: name,
             Type: ACCESS_TYPE,
-            Overwrite: true,
+            Overwrite: false,
             KeyId: kmsKeyId,
             Value: payload,
             Tier: tier,
@@ -134,8 +138,7 @@ export function createParameterStoreTokenMethods({
       createdAt: record.createdAt,
       expiresAt,
       metadata: {
-        ...(record.metadata ?? {}),
-        ...metadataToObject(updateData.metadata),
+        ...(metadataToObject(updateData.metadata) ?? record.metadata ?? {}),
         encrypted,
       },
       encrypted,
@@ -148,7 +151,7 @@ export function createParameterStoreTokenMethods({
     );
 
     const payload = JSON.stringify(mergedRecord);
-    const tier = payload.length > 4096 ? 'Advanced' : undefined;
+    const tier = Buffer.byteLength(payload, 'utf8') > 4096 ? 'Advanced' : undefined;
 
     await withRetry(
       () =>
@@ -186,6 +189,9 @@ export function createParameterStoreTokenMethods({
     }
 
     if (typeof query.identifier === 'string' && query.userId) {
+      if (!(await loadRecord(query))) {
+        return { deletedCount: 0 };
+      }
       targets.push(buildResourceName(prefix, String(query.userId), query.identifier));
     } else if (query.userId) {
       const userPath = `${prefix}/${sanitizeSegment(String(query.userId))}`;
@@ -197,14 +203,18 @@ export function createParameterStoreTokenMethods({
               new GetParametersByPathCommand({
                 Path: userPath,
                 Recursive: true,
-                WithDecryption: false,
+                WithDecryption: true,
                 NextToken: nextToken,
               }),
             ),
           retryOptions,
         );
         (response.Parameters ?? []).forEach((param: Parameter) => {
-          if (param.Name) {
+          if (
+            param.Name &&
+            param.Value &&
+            matchesTokenQuery(JSON.parse(param.Value) as TokenRecordPayload, query)
+          ) {
             targets.push(param.Name);
           }
         });

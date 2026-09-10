@@ -32,13 +32,13 @@ import {
 } from './errors';
 import { createSSRFSafeUndiciConnect, isSSRFTarget, resolveHostnameSSRF } from '~/auth';
 import { reserveMCPToolsChangedRevision } from './toolsChanged';
+import { ElicitationCreateMethodSchema } from './zod';
 import { runOutsideTracing } from '~/utils/tracing';
 import { mediaTypeEssence } from '~/utils/headers';
 import { isAddressAllowed } from '~/auth/domain';
 import { withTimeout } from '~/utils/promise';
 import { isOAuthServer } from './utils';
 import { mcpConfig } from './mcpConfig';
-import { ElicitationCreateMethodSchema } from './zod';
 
 type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 type ManagedDispatcher = Agent | ProxyAgent;

@@ -401,7 +401,9 @@ describe('MCPOAuthHandler - Configurable OAuth Metadata', () => {
         baseConfig,
       );
 
-      expect(new URL(result.authorizationUrl).searchParams.get('state')).toBe(result.flowMetadata.state);
+      expect(new URL(result.authorizationUrl).searchParams.get('state')).toBe(
+        result.flowMetadata.state,
+      );
       expect(result.flowMetadata.state).not.toBe(result.flowId);
     });
 

@@ -271,6 +271,7 @@ export function useMCPServerManager({
       await dataService.bindMCPOAuth(serverName);
     } catch (error) {
       console.error(`[MCP Manager] Failed to bind OAuth for ${serverName}:`, error);
+      throw error;
     }
 
     window.open(oauthUrl, '_blank', 'noopener,noreferrer');

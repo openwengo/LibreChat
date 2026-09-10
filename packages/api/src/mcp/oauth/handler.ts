@@ -32,15 +32,11 @@ import {
   selectRegistrationAuthMethod,
   inferClientAuthMethod,
 } from './methods';
+import { buildMCPOAuthFlowId, isMCPOAuthFlowOwnedByUser, parseMCPOAuthFlowId } from './scope';
 import { isSSRFTarget, resolveHostnameSSRF, isOAuthUrlAllowed } from '~/auth';
 import { probeResourceMetadataHint } from './resourceHint';
 import { createHardenedOAuthFetch } from './hardenedFetch';
 import { sanitizeUrlForLogging } from '~/mcp/utils';
-import {
-  buildMCPOAuthFlowId,
-  isMCPOAuthFlowOwnedByUser,
-  parseMCPOAuthFlowId,
-} from './scope';
 import { MCPTokenStorage } from './tokens';
 import { getOAuthUrlPort } from './url';
 
@@ -1168,7 +1164,7 @@ export class MCPOAuthHandler {
     rollbackPersistedTokens?: (tokens: MCPOAuthTokens) => Promise<void>,
     expectedAttempt?: { createdAt: number; state: string },
   ): Promise<MCPOAuthTokens> {
-    let observedFlowState: FlowState<MCPOAuthTokens> | null = null;
+    let observedFlowState: FlowState<MCPOAuthTokens | null> | null = null;
     try {
       /** Flow state which contains our metadata */
       const flowState = await flowManager.getFlowState(flowId, this.FLOW_TYPE);
@@ -1313,7 +1309,7 @@ export class MCPOAuthHandler {
     return flowState.metadata as MCPOAuthFlowMetadata;
   }
 
-  static parseFlowId(flowId: string) {
+  static parseFlowId(flowId: string): ReturnType<typeof parseMCPOAuthFlowId> {
     return parseMCPOAuthFlowId(flowId);
   }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Provider, createStore } from 'jotai';
-import { renderHook, act } from '@testing-library/react';
 import { dataService } from 'librechat-data-provider';
+import { renderHook, act } from '@testing-library/react';
 import { useMCPServerManager } from '../useMCPServerManager';
 
 const mockShowToast = jest.fn();
@@ -53,6 +53,7 @@ jest.mock('librechat-data-provider/react-query', () => ({
 }));
 
 jest.mock('~/data-provider', () => ({
+  useMCPToolsQuery: jest.fn(() => ({ data: undefined })),
   useGetStartupConfig: jest.fn(() => ({
     data: undefined,
   })),
@@ -69,6 +70,8 @@ jest.mock('~/data-provider', () => ({
 
 jest.mock('~/hooks', () => ({
   useLocalize: jest.fn(() => (key: string) => key),
+  useHasAccess: jest.fn(() => true),
+  useCatalogReady: jest.fn(() => true),
   useMCPConnectionStatus: jest.fn(() => ({
     connectionStatus: {},
   })),
@@ -132,6 +135,15 @@ describe('useMCPServerManager', () => {
     expect(bindMCPOAuth.mock.invocationCallOrder[0]).toBeLessThan(
       mockWindowOpen.mock.invocationCallOrder[0],
     );
+  });
+
+  it('does not open OAuth when browser binding fails', async () => {
+    bindMCPOAuth.mockRejectedValueOnce(new Error('binding failed'));
+    const { result } = renderHook(() => useMCPServerManager(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.initializeServer('kubectl_mcp');
+    });
+    expect(mockWindowOpen).not.toHaveBeenCalled();
   });
 
   it('binds MCP OAuth before continuing a pending authorization flow', async () => {

@@ -1,37 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@librechat/client';
+import type { ElicitationPropertySchema, ElicitationRequest } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
-
-interface ElicitationPropertySchema {
-  type: 'string' | 'number' | 'integer' | 'boolean';
-  title?: string;
-  description?: string;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
-  format?: 'email' | 'uri' | 'date' | 'date-time';
-  default?: string | number | boolean;
-  enum?: string[];
-  enumNames?: string[];
-}
-
-interface ElicitationRequestSchema {
-  type: 'object';
-  properties: Record<string, ElicitationPropertySchema>;
-  required?: string[];
-}
-
-interface ElicitationRequest {
-  message: string;
-  requestedSchema: ElicitationRequestSchema;
-}
 
 interface ElicitationFormProps {
   request: ElicitationRequest;
   serverName: string;
-  onAccept: (data: Record<string, unknown>) => void;
+  onAccept: (data: Record<string, unknown>) => void | Promise<void>;
   onDecline: () => void;
   onCancel: () => void;
 }
@@ -45,6 +21,7 @@ export default function ElicitationForm({
 }: ElicitationFormProps) {
   const localize = useLocalize();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   const {
     register,
@@ -65,8 +42,11 @@ export default function ElicitationForm({
   const onSubmit = useCallback(
     async (data: Record<string, unknown>) => {
       setIsSubmitting(true);
+      setSubmitError(false);
       try {
-        onAccept(data);
+        await onAccept(data);
+      } catch {
+        setSubmitError(true);
       } finally {
         setIsSubmitting(false);
       }
@@ -80,24 +60,24 @@ export default function ElicitationForm({
 
     // Validation rules
     const validationRules: Record<string, unknown> = {
-      required: isRequired ? `${property.title || key} is required` : false,
+      required: isRequired ? localize('com_ui_field_required') : false,
     };
 
     if (property.type === 'string') {
       if (property.minLength)
         validationRules.minLength = {
           value: property.minLength,
-          message: `Minimum length is ${property.minLength}`,
+          message: localize('com_ui_elicitation_min_length', { 0: property.minLength }),
         };
       if (property.maxLength)
         validationRules.maxLength = {
           value: property.maxLength,
-          message: `Maximum length is ${property.maxLength}`,
+          message: localize('com_ui_elicitation_max_length', { 0: property.maxLength }),
         };
       if (property.format === 'email')
         validationRules.pattern = {
           value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-          message: 'Please enter a valid email address',
+          message: localize('com_auth_email_pattern'),
         };
     }
 
@@ -105,12 +85,12 @@ export default function ElicitationForm({
       if (property.minimum !== undefined)
         validationRules.min = {
           value: property.minimum,
-          message: `Minimum value is ${property.minimum}`,
+          message: localize('com_ui_elicitation_min_value', { 0: property.minimum }),
         };
       if (property.maximum !== undefined)
         validationRules.max = {
           value: property.maximum,
-          message: `Maximum value is ${property.maximum}`,
+          message: localize('com_ui_elicitation_max_value', { 0: property.maximum }),
         };
     }
 
@@ -139,7 +119,7 @@ export default function ElicitationForm({
               id={fieldId}
               type="checkbox"
               {...register(key, validationRules)}
-              className="h-4 w-4 rounded border-border-medium text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-border-medium text-text-primary focus:ring-border-heavy"
             />
             <label htmlFor={fieldId} className="ml-2 text-sm text-text-primary">
               {property.title || key}
@@ -186,7 +166,7 @@ export default function ElicitationForm({
       <div key={key} className="mb-4">
         <label htmlFor={fieldId} className="mb-2 block text-sm font-medium text-text-primary">
           {property.title || key}
-          {isRequired && <span className="ml-1 text-red-500">*</span>}
+          {isRequired && <span className="ml-1 text-text-warning">*</span>}
         </label>
 
         {property.description && (
@@ -198,7 +178,7 @@ export default function ElicitationForm({
         {renderInput()}
 
         {errors[key] && (
-          <p className="mt-1 text-xs text-red-500">{errors[key]?.message as string}</p>
+          <p className="mt-1 text-xs text-text-warning">{errors[key]?.message as string}</p>
         )}
       </div>
     );
@@ -220,6 +200,11 @@ export default function ElicitationForm({
           renderField(key, property),
         )}
 
+        {submitError && (
+          <p role="alert" className="text-text-warning">
+            {localize('com_ui_approval_error')}
+          </p>
+        )}
         <div className="flex justify-end space-x-3 pt-4">
           <Button
             type="button"

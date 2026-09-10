@@ -1,4 +1,8 @@
 {
+  "com_ui_elicitation_min_length": "Minimum length is {{0}}",
+  "com_ui_elicitation_max_length": "Maximum length is {{0}}",
+  "com_ui_elicitation_min_value": "Minimum value is {{0}}",
+  "com_ui_elicitation_max_value": "Maximum value is {{0}}",
   "com_ui_schedule_mcp_ready": "Ready for scheduled chats",
   "com_ui_schedule_mcp_reauth": "Reconnect this MCP server before enabling the schedule.",
   "com_ui_schedule_mcp_configuration": "Configure or remove this MCP server before enabling the schedule.",

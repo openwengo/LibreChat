@@ -1,3 +1,4 @@
+const elicitationRouter = require('./mcp/elicitation');
 const { getTokenStoreMethods } = require('~/server/services/TokenStore');
 const { Router } = require('express');
 const { logger, getTenantId, tenantStorage } = require('@librechat/data-schemas');

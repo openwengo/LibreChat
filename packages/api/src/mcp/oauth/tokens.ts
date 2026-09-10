@@ -10,8 +10,8 @@ import type {
 import type { OAuthTokens, OAuthClientInformation } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { MCPOAuthTokens, ExtendedOAuthTokens, OAuthStoredClientMetadata } from './types';
 import type { FlowLease, FlowStateManager } from '~/flow/manager';
-import { isInvalidClientMessage } from '~/mcp/utils';
 import { extractEncryptedFlag } from './storage/awsUtils';
+import { isInvalidClientMessage } from '~/mcp/utils';
 import { isSystemUserId } from '~/mcp/enum';
 
 export class ReauthenticationRequiredError extends Error {
@@ -720,7 +720,11 @@ export class MCPTokenStorage {
           identifier: `${identifier}:client`,
           token: encryptedClientInfo,
           expiresIn: 365 * 24 * 60 * 60,
-          metadata: { ...metadata, credential_set_id: credentialSetId, encrypted: this.encryptTokens },
+          metadata: {
+            ...metadata,
+            credential_set_id: credentialSetId,
+            encrypted: this.encryptTokens,
+          },
         };
 
         plannedWrites.push({
@@ -1225,7 +1229,10 @@ export class MCPTokenStorage {
         logger.info(`${logPrefix} Refresh grant is no longer valid. New authentication required.`);
         return null;
       }
-      if (isInvalidClientMessage(errorMessage) || normalizedErrorMessage.includes('invalid_scope')) {
+      if (
+        isInvalidClientMessage(errorMessage) ||
+        normalizedErrorMessage.includes('invalid_scope')
+      ) {
         if (deleteTokens) {
           logger.info(
             `${logPrefix} Client registration rejected during token refresh, attempting to clear stale registration and refresh token`,

@@ -1,6 +1,6 @@
+import jwt from 'jsonwebtoken';
 import crypto, { createHmac } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import {
   shouldUseSecureCookie,
   OAUTH_SESSION_COOKIE,

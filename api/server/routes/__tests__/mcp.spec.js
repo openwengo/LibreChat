@@ -62,7 +62,9 @@ jest.mock('@librechat/api', () => {
       storeStateMapping: jest.fn(),
       deleteStateMapping: jest.fn(),
       failFlowAndDeleteStateMapping: jest.fn(),
-      isFlowOwnedByUser: jest.fn((flowId, userId) => mockParseTestFlowId(flowId)?.userId === userId),
+      isFlowOwnedByUser: jest.fn((flowId, userId) =>
+        actual.MCPOAuthHandler.isFlowOwnedByUser(flowId, userId),
+      ),
     },
     MCPTokenStorage: {
       storeTokens: jest.fn(),
