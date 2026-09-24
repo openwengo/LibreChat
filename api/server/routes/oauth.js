@@ -16,12 +16,12 @@ const {
   loginLimiter,
   logHeaders,
   markOAuthNavigation,
-  verifyGoogleGroupMembership,
 } = require('~/server/middleware');
 const { createOAuthHandler } = require('~/server/controllers/auth/oauth');
 const { findBalanceByUser, upsertBalanceFields } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
-const { getGoogleScopes } = require('~/strategies/googleStrategy');
+const verifyGoogleGroupMembership = require('~/server/middleware/checkGoogleGroup');
+const { getGoogleScopes } = require('~/strategies/googleGroup');
 
 const setBalanceConfig = createSetBalanceConfig({
   getAppConfig,

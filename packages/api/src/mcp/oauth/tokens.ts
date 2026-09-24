@@ -13,6 +13,7 @@ import type { MCPOAuthTokens, ExtendedOAuthTokens, OAuthStoredClientMetadata } f
 import type { FlowLease, FlowStateManager } from '~/flow/manager';
 import { extractEncryptedFlag } from './storage/awsUtils';
 import { isInvalidClientMessage } from '~/mcp/utils';
+import { getMCPOAuthNamespace } from './scope';
 import { isSystemUserId } from '~/mcp/enum';
 
 export class ReauthenticationRequiredError extends Error {
@@ -145,14 +146,17 @@ export const getMCPOAuthLeaseId = (
 /**
  * Lease that serializes refresh-token redemption for one stored credential across replicas.
  *
- * Keyed by what is stored — tenant, user, server name — and deliberately *not* by the caller's
- * OAuth binding scope, even though the process-local single-flight key carries it. The refresh
- * record lives at `mcp:<serverName>:refresh`, with no binding in its identifier, and
- * `assertCredentialSetBinding` compares only `credential_set_id`, so a config change that moves the
- * binding digest without invalidating the stored credential still permits refresh. Scoping this
- * lease by that digest would then hand two replicas different locks over one stored token during a
- * rolling config change, which is the concurrency the lease exists to remove. The scope stays where
- * it decides which callers may share a returned result, not which redemptions may run at once.
+ * Keyed by what is stored — deployment namespace, tenant, user, server name — and deliberately
+ * *not* by the caller's OAuth binding scope, even though the process-local single-flight key
+ * carries it. Scoped token methods keep the refresh record at
+ * `mcp:<namespace>:<serverName>:refresh`, so deployments sharing one lease store never wait on
+ * each other's flight over credentials they do not share. The identifier carries no binding, and
+ * `assertCredentialSetBinding` compares only `credential_set_id`, so a config change that moves
+ * the binding digest without invalidating the stored credential still permits refresh. Scoping
+ * this lease by that digest would then hand two replicas different locks over one stored token
+ * during a rolling config change, which is the concurrency the lease exists to remove. The scope
+ * stays where it decides which callers may share a returned result, not which redemptions may run
+ * at once.
  *
  * Distinct from `getMCPOAuthLeaseId`: that lease is the teardown/persistence fence taken *inside* a
  * redemption, so one shared key would make a redemption wait on a lease it already holds.
@@ -161,7 +165,8 @@ export const getMCPOAuthRefreshFlightLeaseId = (
   userId: string,
   serverName: string,
   tenantId: string | undefined = getTenantId(),
-): string => JSON.stringify(['refresh', tenantId ?? '', userId, serverName]);
+): string =>
+  JSON.stringify(['refresh', getMCPOAuthNamespace(), tenantId ?? '', userId, serverName]);
 
 /**
  * Reads the `exp` claim (RFC 7519 §4.1.4 / RFC 9068) from a JWT-format access
@@ -1682,11 +1687,10 @@ export class MCPTokenStorage {
         }
         // These endpoint responses reject the refresh request permanently; a new grant can recover.
         // Classify only provider failures here, never a similarly worded persistence failure.
+        // `invalid_scope` falls through to the stale client registration cleanup below.
         const message = error instanceof Error ? error.message : String(error);
         if (
-          /\b(unsupported_grant_type|invalid_request|invalid_scope|invalid_target|access_denied)\b/i.test(
-            message,
-          )
+          /\b(unsupported_grant_type|invalid_request|invalid_target|access_denied)\b/i.test(message)
         ) {
           return null;
         }

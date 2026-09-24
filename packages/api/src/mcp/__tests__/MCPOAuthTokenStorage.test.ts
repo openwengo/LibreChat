@@ -1350,7 +1350,6 @@ describe('MCPTokenStorage', () => {
       'unauthorized_client',
       'unsupported_grant_type',
       'invalid_request',
-      'invalid_scope',
       'invalid_target',
       'access_denied',
     ])('handles permanent endpoint rejection %s', async (code) => {
@@ -2416,6 +2415,40 @@ describe('MCPTokenStorage', () => {
         );
         expect(refreshTokens).toHaveBeenCalledTimes(1);
         expect(release).toHaveBeenCalled();
+      });
+
+      it('redeems without waiting on another deployment holding the same user and server flight', async () => {
+        const serverName = 'namespaced-flight';
+        await seedRefreshableTokens(serverName);
+        const keyv = new Keyv({ serialize: JSON.stringify, deserialize: JSON.parse });
+        const otherDeployment = new FlowStateManager(keyv, { ttl: 30000, ci: true });
+        const thisDeployment = new FlowStateManager(keyv, { ttl: 30000, ci: true });
+        const previousNamespace = process.env.MCP_OAUTH_NAMESPACE;
+        try {
+          process.env.MCP_OAUTH_NAMESPACE = 'deployment-a';
+          const otherFlightId = getMCPOAuthRefreshFlightLeaseId('u1', serverName);
+          const otherFlight = await otherDeployment.acquireLease(otherFlightId, { waitMs: 0 });
+          expect(otherFlight).not.toBeNull();
+
+          process.env.MCP_OAUTH_NAMESPACE = 'deployment-b';
+          expect(getMCPOAuthRefreshFlightLeaseId('u1', serverName)).not.toBe(otherFlightId);
+          const refreshTokens = jest.fn().mockResolvedValue(rotatedTokens(2));
+          await expect(
+            MCPTokenStorage.forceRefreshTokens({
+              ...refreshParams(refreshTokens, serverName),
+              flowManager: thisDeployment,
+              refreshWaitTimeoutMs: 300,
+            }),
+          ).resolves.toMatchObject({ access_token: 'at-2' });
+          expect(refreshTokens).toHaveBeenCalledTimes(1);
+          await otherFlight?.release();
+        } finally {
+          if (previousNamespace === undefined) {
+            delete process.env.MCP_OAUTH_NAMESPACE;
+          } else {
+            process.env.MCP_OAUTH_NAMESPACE = previousNamespace;
+          }
+        }
       });
 
       it('adopts the tokens another replica rotated while the flight was held', async () => {

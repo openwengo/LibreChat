@@ -1,8 +1,8 @@
 const { logger } = require('@librechat/data-schemas');
-const { checkGroupMembership } = require('~/strategies/googleStrategy');
+const { checkGroupMembership } = require('~/strategies/googleGroup');
 const verifyGoogleGroupMembership = require('./checkGoogleGroup');
 
-jest.mock('~/strategies/googleStrategy', () => ({
+jest.mock('~/strategies/googleGroup', () => ({
   checkGroupMembership: jest.fn(),
 }));
 

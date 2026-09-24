@@ -9,7 +9,6 @@ const mockMutateAsync = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockGetQueryData = jest.fn();
 const mockRefetchQueries = jest.fn();
-const mockWindowOpen = jest.fn();
 
 jest.mock('@librechat/client', () => ({
   useToastContext: jest.fn(() => ({
@@ -88,6 +87,14 @@ describe('useMCPServerManager', () => {
     typeof dataService.bindMCPOAuth
   >;
 
+  const authorizationLink = {
+    href: 'https://kubectl-mcp.wengo.com/authorize?state=test',
+    target: '_blank',
+    rel: 'noopener noreferrer',
+  };
+  let openedLinks: Array<typeof authorizationLink>;
+  let anchorClick: jest.SpyInstance<void, []>;
+
   const createWrapper = () => {
     const store = createStore();
 
@@ -99,9 +106,11 @@ describe('useMCPServerManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    Object.defineProperty(window, 'open', {
-      configurable: true,
-      value: mockWindowOpen,
+    openedLinks = [];
+    anchorClick = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      openedLinks.push({ href: this.href, target: this.target, rel: this.rel });
     });
 
     bindMCPOAuth.mockResolvedValue({ success: true });
@@ -113,6 +122,7 @@ describe('useMCPServerManager', () => {
   });
 
   afterEach(() => {
+    anchorClick.mockRestore();
     jest.clearAllTimers();
     jest.useRealTimers();
   });
@@ -127,13 +137,9 @@ describe('useMCPServerManager', () => {
     });
 
     expect(bindMCPOAuth).toHaveBeenCalledWith('kubectl_mcp');
-    expect(mockWindowOpen).toHaveBeenCalledWith(
-      'https://kubectl-mcp.wengo.com/authorize?state=test',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(openedLinks).toEqual([authorizationLink]);
     expect(bindMCPOAuth.mock.invocationCallOrder[0]).toBeLessThan(
-      mockWindowOpen.mock.invocationCallOrder[0],
+      anchorClick.mock.invocationCallOrder[0],
     );
   });
 
@@ -143,7 +149,7 @@ describe('useMCPServerManager', () => {
     await act(async () => {
       await result.current.initializeServer('kubectl_mcp');
     });
-    expect(mockWindowOpen).not.toHaveBeenCalled();
+    expect(anchorClick).not.toHaveBeenCalled();
   });
 
   it('binds MCP OAuth before continuing a pending authorization flow', async () => {
@@ -155,20 +161,16 @@ describe('useMCPServerManager', () => {
       await result.current.initializeServer('kubectl_mcp', false);
     });
 
-    expect(mockWindowOpen).not.toHaveBeenCalled();
+    expect(anchorClick).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.continueOAuth('kubectl_mcp');
     });
 
     expect(bindMCPOAuth).toHaveBeenCalledWith('kubectl_mcp');
-    expect(mockWindowOpen).toHaveBeenCalledWith(
-      'https://kubectl-mcp.wengo.com/authorize?state=test',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(openedLinks).toEqual([authorizationLink]);
     expect(bindMCPOAuth.mock.invocationCallOrder[0]).toBeLessThan(
-      mockWindowOpen.mock.invocationCallOrder[0],
+      anchorClick.mock.invocationCallOrder[0],
     );
   });
 });

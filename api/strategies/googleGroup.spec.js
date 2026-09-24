@@ -22,8 +22,6 @@ jest.mock('@googleapis/cloudidentity', () => ({
   },
 }));
 
-jest.mock('./socialLogin', () => jest.fn(() => jest.fn()));
-
 jest.mock('@librechat/data-schemas', () => ({
   ...jest.requireActual('@librechat/data-schemas'),
   logger: {
@@ -33,9 +31,9 @@ jest.mock('@librechat/data-schemas', () => ({
 }));
 
 const { logger } = require('@librechat/data-schemas');
-const { checkGroupMembership, getGoogleScopes } = require('./googleStrategy');
+const { checkGroupMembership, getGoogleScopes } = require('./googleGroup');
 
-describe('googleStrategy Workspace group checks', () => {
+describe('Google Workspace group checks', () => {
   const originalGoogleWorkspaceGroup = process.env.GOOGLE_WORKSPACE_GROUP;
 
   beforeEach(() => {

@@ -235,7 +235,11 @@ describe('MCP OAuth Race Condition Fixes', () => {
         const user = { id: 'user-oauth' };
         const serverName = 'test-server';
         const authorizationUrl = 'https://auth.example.com/existing';
-        await flowManager.initFlow(`${user.id}:${serverName}`, 'mcp_oauth', { authorizationUrl });
+        await flowManager.initFlow(
+          MCPOAuthHandler.generateFlowId(user.id, serverName),
+          'mcp_oauth',
+          { authorizationUrl },
+        );
 
         const firstConnection = manager.getUserConnection({
           serverName,
@@ -336,7 +340,11 @@ describe('MCP OAuth Race Condition Fixes', () => {
         });
         const user = { id: 'user-oauth-emitted' };
         const serverName = 'test-server';
-        await flowManager.initFlow(`${user.id}:${serverName}`, 'mcp_oauth', { authorizationUrl });
+        await flowManager.initFlow(
+          MCPOAuthHandler.generateFlowId(user.id, serverName),
+          'mcp_oauth',
+          { authorizationUrl },
+        );
 
         const firstOAuthStart = jest.fn().mockResolvedValue(undefined);
         const firstOAuthEnd = jest.fn().mockRejectedValue(new Error('owner response is stale'));

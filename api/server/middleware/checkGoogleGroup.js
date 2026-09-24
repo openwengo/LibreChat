@@ -1,5 +1,5 @@
 const { logger } = require('@librechat/data-schemas');
-const { checkGroupMembership } = require('~/strategies/googleStrategy');
+const { checkGroupMembership } = require('~/strategies/googleGroup');
 
 const domains = {
   client: process.env.DOMAIN_CLIENT,

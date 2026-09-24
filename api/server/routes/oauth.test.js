@@ -205,3 +205,41 @@ describe('OAuth route failure logging', () => {
     expect(JSON.stringify(mockLogger.warn.mock.calls[0])).not.toContain('Unknown OAuth error');
   });
 });
+
+describe('Google Workspace group restriction', () => {
+  const originalWorkspaceGroup = process.env.GOOGLE_WORKSPACE_GROUP;
+
+  beforeEach(() => {
+    mockOAuthHandler.mockClear();
+    mockPassportAuthenticate.mockClear();
+    mockPassportAuthenticate.mockImplementation(() => (_req, _res, next) => next());
+    process.env.GOOGLE_WORKSPACE_GROUP = 'allowed@example.com';
+  });
+
+  afterEach(() => {
+    if (originalWorkspaceGroup === undefined) {
+      delete process.env.GOOGLE_WORKSPACE_GROUP;
+      return;
+    }
+    process.env.GOOGLE_WORKSPACE_GROUP = originalWorkspaceGroup;
+  });
+
+  it('requests the group scope and refuses a callback without membership evidence', async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .get('/oauth/google/callback?code=secret-code&state=secret-state')
+      .expect(302);
+
+    expect(response.headers.location).toBe('http://client.test/login?error=auth_error');
+    expect(mockOAuthHandler).not.toHaveBeenCalled();
+    expect(mockPassportAuthenticate).toHaveBeenCalledWith(
+      'google',
+      expect.objectContaining({
+        scope: expect.arrayContaining([
+          'https://www.googleapis.com/auth/cloud-identity.groups.readonly',
+        ]),
+      }),
+    );
+  });
+});

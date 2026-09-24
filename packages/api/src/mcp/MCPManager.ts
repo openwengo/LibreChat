@@ -1436,7 +1436,7 @@ Please follow these instructions when using tools from the respective MCP server
         }
 
         this.setupConnectionElicitationHandler(connection, serverName, userId);
-        connection.setCurrentToolCallId(toolCallId);
+        connection.setCurrentToolCallId?.(toolCallId);
         connection.setRequestHeaders(resolvedHeaders);
 
         const checkedCredentialSetId = connection.getOAuthCredentialSetId?.();
@@ -1667,7 +1667,7 @@ Please follow these instructions when using tools from the respective MCP server
         // Rethrowing allows the caller (createMCPTool) to handle the final user message
         throw error;
       } finally {
-        connection?.clearCurrentToolCallId();
+        connection?.clearCurrentToolCallId?.();
         await releaseConnectionLease();
         // Ephemeral connections are never stored in userConnections, so disposing
         // is the only cleanup needed; removing the map entry here could orphan a
@@ -1765,6 +1765,9 @@ Please follow these instructions when using tools from the respective MCP server
     serverName: string,
     contextUserId?: string,
   ): void {
+    if (!(connection instanceof EventEmitter)) {
+      return;
+    }
     const existingUserId = this.handlerSetupMap.get(connection);
     if (existingUserId === contextUserId) {
       return;
