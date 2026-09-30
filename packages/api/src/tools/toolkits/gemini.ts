@@ -46,6 +46,76 @@ const getGeminiImageIdsDescription = () => {
   return process.env.GEMINI_IMAGE_IDS_DESCRIPTION || DEFAULT_GEMINI_IMAGE_IDS_DESCRIPTION;
 };
 
+type ValueHint = readonly [values: readonly string[], purpose: string];
+
+/** Default aspect ratios, supported by every Gemini image model */
+const DEFAULT_GEMINI_IMAGE_ASPECT_RATIOS = [
+  '1:1',
+  '2:3',
+  '3:2',
+  '3:4',
+  '4:3',
+  '4:5',
+  '5:4',
+  '9:16',
+  '16:9',
+  '21:9',
+];
+
+const DEFAULT_GEMINI_IMAGE_SIZES = ['1K', '2K', '4K'];
+
+const ASPECT_RATIO_HINTS: readonly ValueHint[] = [
+  [['16:9', '3:2'], 'landscape'],
+  [['9:16', '2:3'], 'portrait'],
+  [['21:9'], 'ultra-wide/cinematic'],
+  [['4:1', '8:1'], 'banners/panoramas'],
+  [['1:4', '1:8'], 'tall vertical strips'],
+  [['1:1'], 'square'],
+];
+
+const IMAGE_SIZE_HINTS: readonly ValueHint[] = [
+  [['512'], 'quick drafts'],
+  [['1K'], 'standard'],
+  [['2K'], 'high'],
+  [['4K'], 'maximum quality'],
+];
+
+/** Reads a comma-separated env list, falling back to `defaults` when it is unset or empty */
+const getEnvList = (
+  value: string | undefined,
+  defaults: string[],
+  normalize: (entry: string) => string = (entry) => entry,
+): string[] => {
+  const entries = new Set(
+    (value ?? '')
+      .split(',')
+      .map((entry) => normalize(entry.trim()))
+      .filter(Boolean),
+  );
+  return entries.size > 0 ? [...entries] : defaults;
+};
+
+/** Builds a " Use A or B for x, C for y." sentence from the hints whose values are enabled */
+const describeHints = (enabled: string[], hints: readonly ValueHint[]): string => {
+  const allowed = new Set(enabled);
+  const parts = hints.flatMap(([values, purpose]) => {
+    const matches = values.filter((value) => allowed.has(value));
+    return matches.length > 0 ? [`${matches.join(' or ')} for ${purpose}`] : [];
+  });
+  return parts.length > 0 ? ` Use ${parts.join(', ')}.` : '';
+};
+
+const geminiImageAspectRatios = getEnvList(
+  process.env.GEMINI_IMAGE_ASPECT_RATIOS,
+  DEFAULT_GEMINI_IMAGE_ASPECT_RATIOS,
+);
+
+const geminiImageSizes = getEnvList(
+  process.env.GEMINI_IMAGE_SIZES,
+  DEFAULT_GEMINI_IMAGE_SIZES,
+  (entry) => entry.toUpperCase(),
+);
+
 const geminiImageGenJsonSchema: ExtendedJsonSchema = {
   type: 'object',
   properties: {
@@ -61,15 +131,13 @@ const geminiImageGenJsonSchema: ExtendedJsonSchema = {
     },
     aspectRatio: {
       type: 'string',
-      enum: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
-      description:
-        'The aspect ratio of the generated image. Use 16:9 or 3:2 for landscape, 9:16 or 2:3 for portrait, 21:9 for ultra-wide/cinematic, 1:1 for square. Defaults to 1:1 if not specified.',
+      enum: geminiImageAspectRatios,
+      description: `The aspect ratio of the generated image.${describeHints(geminiImageAspectRatios, ASPECT_RATIO_HINTS)} Defaults to 1:1 if not specified.`,
     },
     imageSize: {
       type: 'string',
-      enum: ['1K', '2K', '4K'],
-      description:
-        'The resolution of the generated image. Use 1K for standard, 2K for high, 4K for maximum quality. Defaults to 1K if not specified.',
+      enum: geminiImageSizes,
+      description: `The resolution of the generated image.${describeHints(geminiImageSizes, IMAGE_SIZE_HINTS)} Defaults to 1K if not specified.`,
     },
   },
   required: ['prompt'],
