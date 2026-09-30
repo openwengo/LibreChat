@@ -9,6 +9,7 @@ const {
   geminiToolkit,
   loadServiceKey,
   getBalanceConfig,
+  getGenAIHttpOptions,
   getEnvProxyDispatcher,
   getTransactionsConfig,
 } = require('@librechat/api');
@@ -90,19 +91,25 @@ async function convertImageFormat(inputBuffer, targetFormat) {
  * @param {Object} options - Initialization options
  * @param {string} [options.GEMINI_API_KEY] - Gemini API key (resolved by loadAuthValues)
  * @param {string} [options.GOOGLE_KEY] - Google API key (resolved by loadAuthValues)
+ * @param {ServerRequest} [options.req] - The request, for configured header templates
+ * @param {Object} [options.body] - The request body, for body header placeholders
  * @returns {Promise<GoogleGenAI>} - The initialized client
  */
 async function initializeGeminiClient(options = {}) {
-  const geminiKey = options.GEMINI_API_KEY;
-  if (geminiKey) {
-    logger.debug('[GeminiImageGen] Using Gemini API with GEMINI_API_KEY');
-    return new GoogleGenAI({ apiKey: geminiKey });
-  }
+  const apiKey = options.GEMINI_API_KEY || options.GOOGLE_KEY;
+  const httpOptions = getGenAIHttpOptions({
+    env: process.env,
+    req: options.req,
+    body: options.body,
+    apiKey,
+  });
 
-  const googleKey = options.GOOGLE_KEY;
-  if (googleKey) {
-    logger.debug('[GeminiImageGen] Using Gemini API with GOOGLE_KEY');
-    return new GoogleGenAI({ apiKey: googleKey });
+  if (apiKey) {
+    const keySource = options.GEMINI_API_KEY ? 'GEMINI_API_KEY' : 'GOOGLE_KEY';
+    logger.debug(`[GeminiImageGen] Using Gemini API with ${keySource}`, {
+      baseUrl: httpOptions?.baseUrl,
+    });
+    return new GoogleGenAI({ apiKey, httpOptions });
   }
 
   logger.debug('[GeminiImageGen] Using Vertex AI with service account');
@@ -121,6 +128,7 @@ async function initializeGeminiClient(options = {}) {
     project: serviceKey.project_id,
     location: process.env.GOOGLE_CLOUD_LOCATION || process.env.GOOGLE_LOC || 'global',
     googleAuthOptions: { credentials: serviceKey },
+    httpOptions,
   });
 }
 
@@ -333,6 +341,8 @@ function createGeminiImageTool(fields = {}) {
         ai = await initializeGeminiClient({
           GEMINI_API_KEY,
           GOOGLE_KEY,
+          req,
+          body: runnableConfig?.configurable?.requestBody,
         });
       } catch (error) {
         logger.error('[GeminiImageGen] Failed to initialize client:', error);
